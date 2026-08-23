@@ -11,4 +11,3 @@ ACNode KEYWORD1
 #######################################
 # Methods and Functions (KEYWORD2)
 #######################################
-verify_beat KEYWORD2

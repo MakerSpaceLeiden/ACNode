@@ -69,5 +69,7 @@ private:
 
     unsigned char _unknownTagsToSentQueued = 0;
     char _unknownTagsToSent[MAX_QUEUED][RFID_MAX_TAG_STRING_LEN];
+    bool _stateChanged = false;
+
 };
 #endif

@@ -27,7 +27,7 @@ void ACNodeRest::reportStateChange() {
    //
    JsonDocument jsonDoc(&jsonAllocator);
    JsonObject out = jsonDoc.to<JsonObject>();
-   report(out);
+   status(out);
 
    // Send out an update on a specific MQTT channel
    char topic[128];
@@ -79,7 +79,7 @@ void ACNodeRest::pop() {
     // Keep the world pro-actively informed of state changes (push).
     //
     machinestate.addOnChangeCallback(MachineState::ALL_STATES, [&](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
-	// reportStateChange();
+	_stateChanged = true;
     });
 
     machinestate.setState(MachineState::BOOTING);
@@ -151,8 +151,8 @@ void ACNodeRest::request_approval(const char * tag, const char * operation, cons
 
         // Is this a take over of an active machine ? then do a superfluous report.
 	//
-//      if (machinestate > MachineState::CHECKINGCARD)
-//		reportStateChange();
+      if (machinestate > MachineState::CHECKINGCARD)
+		_stateChanged = true;
 
         _approve++;
         return;
@@ -292,6 +292,11 @@ void ACNodeRest::loop() {
 	};
         
 	lst = millis();
+    };
+
+    if (_stateChanged && machinestate.isStable()) {
+		_stateChanged = false;
+		reportStateChange();
     };
 
     // Reboot for memory fragmentation reasons; may perhaps no longer

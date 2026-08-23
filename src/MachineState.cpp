@@ -45,7 +45,7 @@ const char * MachineState::label()  {
 
 bool MachineState::safeForOTA() { return _state2stateStruct[machinestate]->safeForOTA;};
 bool MachineState::backgroundTaskOk() { return _state2stateStruct[machinestate]->backgroundTaskOk;};
-bool MachineState::isStable() { return lastloopstate == machinestate; };
+bool MachineState::isStable() { return (lastloopstate == machinestate) && (millisInThisState() > 250); };
 
 const char * MachineState::label(uint8_t state)  {
     if (_state2stateStruct[state] && _state2stateStruct[state] ->label)
@@ -213,6 +213,10 @@ void MachineState::loop()
         (*it)(machinestate);
  
     lastloopstate = machinestate;
+};
+
+unsigned long MachineState::millisInThisState() {
+    return millis() - laststatechange;
 };
 
 time_t MachineState::secondsInThisState() {
