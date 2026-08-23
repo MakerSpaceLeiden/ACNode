@@ -33,8 +33,6 @@
 #error "Black/Blue Hardware is expected to be an ESP32 WROOM-DA"
 #endif
 
-
-
 #include <BlueNodev114.h>
 
 #define MACHINE "olgabinnen"
