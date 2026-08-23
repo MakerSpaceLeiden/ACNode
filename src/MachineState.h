@@ -146,7 +146,7 @@ public:
     void setLedState(machinestate_t s, LED::led_state_t l) {
         _state2stateStruct[s]->ledState= l;
     };
-    unsigned ling millisInThisState();
+    unsigned long millisInThisState();
     time_t secondsInThisState();
     time_t secondsLeftInThisState();
     String timeLeftInThisState();

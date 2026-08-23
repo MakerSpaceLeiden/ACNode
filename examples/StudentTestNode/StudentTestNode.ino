@@ -19,7 +19,7 @@
 
   QR code shown:
 
-   https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_lintzaag
+   https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_studenttest
 
    2025/02/10 - changes freom a 1.08 white not to a newer blue board
 */
@@ -34,10 +34,10 @@
 #endif
 
 #ifndef MACHINE
-#define MACHINE "studenttest"  // tafelcircelzaag
+#define MACHINE "studenttest"  // Student test/demo node
 #endif
 
-#define INTERLOCK (node.OPTO0)  // Detect voltage on the interlock/safety contactor.
+#define INTERLOCK (node.OPTO0)         // Detect voltage on the interlock/safety contactor.
 // #define ONOFFSWITCH (node.OPTO1)    // Detects voltage on the normally-closed circuit of the front switch.
 // #define MOTOR_CURRENT (node.CURR0)  // One of the 3-phase wires to the motor runs through this current coil.
 

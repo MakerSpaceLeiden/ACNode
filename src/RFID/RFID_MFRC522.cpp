@@ -180,7 +180,7 @@ void RFID_MFRC522::report(JsonObject & report) {
 bool RFID_MFRC522::alive() {
     for(int retry = 0; retry < 3; retry++) {
         byte version = _mfrc522->PCD_ReadRegister(MFRC522::VersionReg);
-	if ((version & 0xF0 == 0x90) || (version == 0x12)) {
+	if (((version & 0xF0) == 0x90) || (version == 0x12)) {
 		rfid_tests++;
     		Debug.println("RFID_MFRC522 alive");
 		return true;
