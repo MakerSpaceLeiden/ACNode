@@ -68,9 +68,6 @@ void setup() {
 
   node.setOnChangeCallback(BYEBYE, [&](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
     ApprovalEntry *e = node.lastApproved();
-    if (!e)
-      return;
-
     const char *name = NULL;
 
     if (e && e->shortName)
@@ -78,8 +75,13 @@ void setup() {
     else if (e && e->name)
       name = e->name;
 
-    node.updateDisplayStateMsg(name, 2);
-    Log.printf("Saying bye to %s\n", name);
+    if (name) {
+      node.updateDisplayStateMsg(name, 2);
+      Log.printf("Saying bye to %s\n", name);
+    } else {
+      node.updateDisplayStateMsg("bye!", 2);
+      Log.printf("Saying byeye\n");
+    };
   });
 
   node.onApproval([](const char *machine) {
