@@ -138,37 +138,38 @@ and include a statement such as
 
 to include any #define's to override the default ones. E.g. for the WIFI and OTA passwords used.
 
-An example set is shown below. Note that the wifi is only needed for Wifi nodes - it is ignored by PoE/wired nodes.
+An example set is shown below. 
 
-#ifndef _H_LOCAL_CONFIG
-#define _H_LOCAL_CONFIG
+        #ifndef _H_LOCAL_CONFIG
+        #define _H_LOCAL_CONFIG
+        
+        #warning "Settings for Makerspace network active !"
+        
+        // Trick to take over Serial.print if needed.
+        #pragma weak panic_print_char
+        
+        #define WIFI_NETWORK   "XXXX"
+        #define WIFI_PASSWD    "XXXX"
 
-#warning "Settings for Makerspace network active !"
+        #define SYSLOG_HOST    "192.168.1.2"
 
-// Trick to take over Serial.print if needed.
-#pragma weak panic_print_char
+        #define NTP_SERVER     "192.168.1.1"
+        #define NTP_POOL       NTP_SERVER ,"some.pool.ntp.org.xxxx"
 
-#define WIFI_NETWORK	"XXXX"
-#define WIFI_PASSWD    	"XXXX"
-#define NTP_SERVER	    "192.168.1.1"
-#define SYSLOG_HOST	    "192.168.1.2"
+        // Output of 'echo -n password | openssl sha256':
+        #define OTA_PASSWD_HASH256  "ebd2f3fb12021751f2c86fb72c7af6551a8d290b84eba23dbbb0151ae76179be"
+        
+        #define MQTT_HOST      "192.168.1.4"
+        #define MQTT_TOPIC_PREFIX "testestest"
+        
+        #define URL          "https://192.168.1.3:4443/"
+        #define PAY_URL      URL "pettycash/api"
+        #define ACL_URL      URL "acl/api"
+        #define TERMINAL_URL URL "terminal/api"
+        #define SUMUP_URL    URL "sumup/api/v1/sumup-pay"
+        #define UNKTAG_URL   URL "api/v2/unknowntag"
+        
+        #define RDN_DN_O "Makerspace Leiden Foundation"
+        #define RDN_DN_L "City"
 
-// Output of 'echo -n password | openssl sha256':
-#define OTA_PASSWD_HASH256  "ebd2f3fb12021751f2c86fb72c7af6551a8d290b84eba23dbbb0151ae76179be"
-#define NTP_POOL 	NTP_SERVER ,"some.pool.ntp.org.xxxx"
-
-#define MQTT_HOST 		"192.168.1.4"
-#define MQTT_TOPIC_PREFIX "testestest"
-
-#define URL          "https://192.168.1.3:4443/"
-#define PAY_URL      URL "pettycash/api"
-#define ACL_URL      URL "acl/api"
-#define TERMINAL_URL URL "terminal/api"
-#define SUMUP_URL    URL "sumup/api/v1/sumup-pay"
-#define UNKTAG_URL   URL "api/v2/unknowntag"
-
-#define RDN_DN_O "Makerspace Leiden Foundation"
-#define RDN_DN_L "City"
-
-
-
+Note that the wifi is only needed for Wifi nodes - it is ignored by PoE/wired nodes.
