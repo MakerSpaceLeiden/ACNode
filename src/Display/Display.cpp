@@ -1,0 +1,259 @@
+#include <qrcode.h> // Part of the ESP32 package
+#include <esp_debug_helpers.h>
+#include <miniz.h>
+
+#include "Display/Display.h"
+#include "Display/msl-logo.h"
+#include "util/common-utils.h"
+
+
+
+bool Display::begin(uint8_t SCREEN_Address, bool reset, const char * bootmsg, bool headless) {
+    _headless = headless;
+
+    if (!i2c_address_exists(Wire, SCREEN_Address)) {
+	if (!_headless)
+           Log.println("ALERT: expected LCD/OLED screen not found.");
+         else
+           Debug.println("Headless mode");
+	_headless = true;
+    };
+    super::begin(SCREEN_Address,reset);
+
+    clearDisplay();
+    drawCentredBitmap(msl_logo,msl_logo_width,msl_logo_height,SH110X_WHITE);
+    if (bootmsg) {
+        setCursor(0,0);
+        setFont(FONT_SMALL);
+        setTextSize(1);
+        setTextColor(SH110X_WHITE);
+        print_centred(bootmsg, false);
+    };
+    oled_command(SH110X_DISPLAYON);
+    display();
+
+    return true;
+}
+
+void Display::setPNGWebResponder(const char *  urlPrefix, AsyncWebServer * server, bool raw) {
+    server->on(urlPrefix, HTTP_GET, [raw,this](AsyncWebServerRequest *request) {
+	uint8_t * dst = (uint8_t *)malloc(SCREEN_HEIGHT*SCREEN_WIDTH);
+	uint8_t * png = NULL;
+	size_t len = 0;
+	if (dst) {
+		// uint8_t * src = getBuffer();
+		uint32_t pix = 0;
+		for(uint16_t y = 0; y < SCREEN_HEIGHT; y++) 
+			for(uint16_t x = 0; x < SCREEN_WIDTH; x++, pix++) 
+			     dst[pix] = getPixel(x,y) ? 255 : 0;
+
+	       	png = (uint8_t *)tdefl_write_image_to_png_file_in_memory(
+			dst,SCREEN_WIDTH, SCREEN_HEIGHT, 1, &len);
+	
+		free(dst);
+	};
+
+       	if (len && png) {
+	        AsyncResponseStream *response = request->beginResponseStream("image/png", len);
+       		response->write(png, len);
+      		request->send(response);
+	} else {
+		Log.printf("Failed to generate the PNG: %s failed",
+			dst ? "conversion" : "malloc");
+  		request->send(500, "text/plain", "Failed to generate the PNG\n");
+	};
+	if (png)
+	       mz_free(png);
+    });
+};
+
+void Display::setWebResponder(const char *  urlPrefix, AsyncWebServer * server, bool raw) {
+    server->on(urlPrefix, HTTP_GET, [raw,this](AsyncWebServerRequest *request) {
+       AsyncResponseStream *response = request->beginResponseStream(
+		"image/pbm", SCREEN_WIDTH*SCREEN_HEIGHT/8+32);
+       response->printf("P4\n%d %d\n", SCREEN_WIDTH,SCREEN_HEIGHT);
+       if (raw) {
+       	 response->write(getBuffer(),  SCREEN_WIDTH * SCREEN_HEIGHT / 8);
+       } else {
+          for(int y = 0; y < SCREEN_HEIGHT; y++) {
+             unsigned char out = 0;
+             for(int x = 0; x < SCREEN_WIDTH; x++) {
+                int i = x & 7;
+                if (!i) 
+                    out = 0;
+  	        if (!getPixel(x,y))
+  		    out |= (1<<(7-i));
+                if (i == 7)
+                    response->write(out);
+            };
+         };
+      };
+      request->send(response);
+    });
+};
+
+
+void Display::drawCentredBitmap(const unsigned char * bitmap, unsigned short w, unsigned short h, unsigned char col) {
+    drawBitmap((SCREEN_WIDTH-w)/2,(SCREEN_HEIGHT-h)/2,bitmap,w,h,col);
+}
+
+void Display::setDisplayScreensaver(bool on) {
+    if (!_headless)
+	    oled_command(on ? SH110X_DISPLAYOFF : SH110X_DISPLAYON);
+}
+
+#define getBBX(str,w,h) uint16_t w,h; { int16_t x,y; getTextBounds(str,0,0,&x,&y,&w,&h); }
+
+void Display::updateDisplay(const char * title, const char * left, const char * right, bool rebuildFull) {
+    if (0) Debug.printf("updateDisplay(%s,%s,%s,%s)\n",
+                 title ? title : "NULL",
+                 left, right, rebuildFull ? "true" : "false");
+
+    if (rebuildFull) {
+        clearDisplay();
+        setTextSize(1);
+        setFont(FONT_LARGE);
+        setTextColor(SH110X_WHITE);
+        int nY = 0;
+        
+        if (title) {
+            getBBX(title,w,h);
+            setCursor((SCREEN_WIDTH - w)/2,h);
+            println(title);
+            nY = getCursorY() + 2;
+        };
+        
+
+        if ((left && strlen(left)) || (right && strlen(right)))
+	    printCmdBar(left, right);
+
+        // Make normal continued print easier by putting the
+        // cursor in a sane location.
+        setTextColor(SH110X_WHITE);
+        setCursor(0,nY);
+        
+        // Uncommet for layout checks
+        // drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
+    };
+    display();
+};
+
+void Display::printCmdBar(const char * left, const char * right) {
+    const uint16_t WBOX = 128/2 - 4;
+    setTextColor(SH110X_BLACK);
+
+    // Fix the sizing in the buttons height wise on
+    // an all caps string. So left and right stay
+    // on the same baseline.
+    setFont(FONT_SMALL);
+    getBBX("XXXXXXX",W,H);
+
+    drawFastHLine(0,SCREEN_HEIGHT-H-5,SCREEN_WIDTH,SH110X_WHITE);
+    drawFastHLine(0,SCREEN_HEIGHT-1,SCREEN_WIDTH,SH110X_WHITE);
+
+    if (left && strlen(left)) {
+          fillRect(0, SCREEN_HEIGHT-H-3, WBOX, H+1, SH110X_WHITE);
+          getBBX(left,w,h);
+          setCursor((WBOX-w)/2,SCREEN_HEIGHT-H-2);
+          println(left);
+    };
+            
+    if (right && strlen(right)) {
+          fillRect(SCREEN_WIDTH-WBOX,  SCREEN_HEIGHT-H-3, WBOX, H+1, SH110X_WHITE);
+          getBBX(right,w,h);
+          setCursor(SCREEN_WIDTH-WBOX+(WBOX-w)/2,SCREEN_HEIGHT-h-2);
+          println(right);
+    };
+    setTextColor(SH110X_WHITE);
+}
+
+void Display::updateDisplayProgressbar(unsigned int percentage, bool rebuildFull) {
+    int y = SCREEN_HEIGHT-16;
+    int l = (SCREEN_WIDTH-4)*percentage / 100.;
+    
+    if (rebuildFull){
+        fillRect(0, y, SCREEN_WIDTH, 20, SH110X_BLACK);
+        drawRect(0, y, SCREEN_WIDTH, 12, SH110X_WHITE);
+    };
+    
+    fillRect(0+2, y+2, l, 12-4, SH110X_WHITE);
+    display();
+}
+
+void Display::updateDisplayStateMsg(const char * msg, int line) {
+    int16_t x,y;
+    uint16_t w,h;
+
+    getTextBounds(msg,0,0,&x,&y,&w,&h);
+
+    y = 16+line*12;
+    fillRect(0, y, SCREEN_WIDTH, 12, SH110X_BLACK);
+ 
+    int i = ( SCREEN_WIDTH - w) / 2;
+    setCursor(i > 0 ? i : 0, y);
+
+    setTextColor(SH110X_WHITE);
+    print(msg);
+    
+    display();
+}
+
+void Display::print_centred(const char * title, bool titlelines) {
+    int16_t x,y;
+    uint16_t w,h;
+    int16_t cy = getCursorY();
+    getTextBounds(title,0,0,&x,&y,&w,&h);
+    if (titlelines) {
+        int16_t l = (SCREEN_WIDTH-w)/2 - 2;
+        int16_t r = (SCREEN_WIDTH+w)/2 + 2 + 2;
+        
+        if (l>2)
+            drawFastHLine(2,cy + h / 2, l-4, SH110X_WHITE);
+        
+        if (r<SCREEN_WIDTH-2)
+            drawFastHLine(r+2,cy + h / 2, SCREEN_WIDTH-r - 4 , SH110X_WHITE);
+        
+    };
+    setCursor((SCREEN_WIDTH-w)/2, cy);
+    print(title);
+    print("\n");
+};
+
+static Display * _d;
+void Display::print_centered_QR(const char * titleOrNull, char * url) {
+    _d = this;
+    esp_qrcode_config_t qrc = {
+        .display_func = ([](esp_qrcode_handle_t qrcode)->void{
+            int s = esp_qrcode_get_size(qrcode);
+            int p = 1;
+            while ((s*(p+1) <= _d->SCREEN_WIDTH) && 
+                   (s*(p+1) <= _d->SCREEN_HEIGHT)
+            ) p++;
+            int ox = (_d->SCREEN_WIDTH - p*s)/2;
+            // For height - two options
+            //
+            // 1) We cannot pass anything to this lambda; as it maps to C, rather than c++.
+            // So we use the state of the cursor to dected an empty title.
+            //
+            // int oy = _d->getCursorY() ? (_d->SCREEN_HEIGHT - p*s -1) : (_d->SCREEN_HEIGHT - p*s)/2;
+            
+            // 2) Always low - because of bezel
+            //
+            int oy = _d->SCREEN_HEIGHT - p*s -1;
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                    if (p == 1)
+                        _d->drawPixel(ox+p*x,oy+p*y, esp_qrcode_get_module(qrcode, x, y) ? SH110X_WHITE : SH110X_BLACK);
+                    else
+                        _d->fillRect(ox+p*x,oy+p*y,p,p,esp_qrcode_get_module(qrcode, x, y) ? SH110X_WHITE : SH110X_BLACK);
+        }),
+            .max_qrcode_version = 10,
+            .qrcode_ecc_level = ESP_QRCODE_ECC_LOW
+    };
+    // Make sure above getCursorY() returns zero if there is no title.
+    setCursor(0, 0);
+    if (titleOrNull) {
+        print_centred(titleOrNull);
+    };
+    esp_qrcode_generate(&qrc,url);
+}
