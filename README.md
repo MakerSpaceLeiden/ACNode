@@ -13,7 +13,7 @@ Once you know this works - delete the ACNode package and replace it by any git c
 ## Debugging
 
 You can follow the serial port - but you can also HTTP or Telnet to the device its IP address (show on the screen as text or as a QR code) to get full remote control/debug information.
-# Full instructons
+# Full instructions
 ## Install software environment for ACNode development
 
 The instruction below is meant for a Windows 10 PC.
@@ -130,11 +130,45 @@ The Arduino software is ready to compile the sketch and download it in the ESP32
 
 If needed - create a file such as
 
-		.../platform.local.txt 
+		<your Arduino path>platform.local.txt 
 
 and include a statement such as
 
-               compiler.cpp.extra_flags=-imacros/Users/dirkx/.local-config.h
+        compiler.cpp.extra_flags=-imacros/Users/username/.local-config.h
 
 to include any #define's to override the default ones. E.g. for the WIFI and OTA passwords used.
+
+An example set is shown below. Note that the wifi is only needed for Wifi nodes - it is ignored by PoE/wired nodes.
+
+#ifndef _H_LOCAL_CONFIG
+#define _H_LOCAL_CONFIG
+
+#warning "Settings for Makerspace network active !"
+
+// Trick to take over Serial.print if needed.
+#pragma weak panic_print_char
+
+#define WIFI_NETWORK	"XXXX"
+#define WIFI_PASSWD    	"XXXX"
+#define NTP_SERVER	    "192.168.1.1"
+#define SYSLOG_HOST	    "192.168.1.2"
+
+// Output of 'echo -n password | openssl sha256':
+#define OTA_PASSWD_HASH256  "ebd2f3fb12021751f2c86fb72c7af6551a8d290b84eba23dbbb0151ae76179be"
+#define NTP_POOL 	NTP_SERVER ,"some.pool.ntp.org.xxxx"
+
+#define MQTT_HOST 		"192.168.1.4"
+#define MQTT_TOPIC_PREFIX "testestest"
+
+#define URL          "https://192.168.1.3:4443/"
+#define PAY_URL      URL "pettycash/api"
+#define ACL_URL      URL "acl/api"
+#define TERMINAL_URL URL "terminal/api"
+#define SUMUP_URL    URL "sumup/api/v1/sumup-pay"
+#define UNKTAG_URL   URL "api/v2/unknowntag"
+
+#define RDN_DN_O "Makerspace Leiden Foundation"
+#define RDN_DN_L "City"
+
+
 
