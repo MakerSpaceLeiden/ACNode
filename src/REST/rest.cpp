@@ -539,9 +539,8 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
     WiFiClient * stream = https.getStreamPtr();
     size_t len = https.getSize();
 
-    unsigned long _lst = millis(), TO = 3500;
-    for(;;) {
-
+    unsigned long _lst = millis(), TO = 10*100, l = 0;
+    for(;l<len;) {
 	    if (!stream->connected()) {
                 if (len != -1) {
                    Log.println("Connection closed unexpectedly");
@@ -552,14 +551,18 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
 
       	    int sizeAvailable = stream->available();
             if (sizeAvailable == 0) {
-		if (millis() > _lst + TO) {
-			Log.println("HTTP read timeout");
+		if ((unsigned long)(millis() - _lst) > TO) {
+			Log.printf("HTTP raw read timeout (received %u, %u to go for total of %u)\n", 
+				l, len - l, len);
                         ret = ERR_RETRYABLE;
 			break;
 		};
-		delay(250);
+		yield();
 		continue;
 	    };
+
+            _lst = millis();
+            TO = 3 * 1000;
 
 	    unsigned char buff[2048];
             size_t left = sizeof(buff);
@@ -582,8 +585,7 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
             if (n != left) {
 		Debug.println("HTTP read incomplete, retry");
             };
-            _lst = millis();
-            TO = 1500;
+	    l += n;
    };
 
    https.end();
@@ -631,7 +633,7 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
 
         WiFiClient * stream = https.getStreamPtr();
         l = 0;
-        unsigned long _lst = millis(), TO = 3500;
+        unsigned long _lst = millis(), TO = 10*1000;
         for(unsigned char * p = buff;;) {
 	    if (!stream->connected()) {
                 if (len != -1)
@@ -641,14 +643,17 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
 
       	    int sizeAvailable = stream->available();
             if (sizeAvailable == 0) {
-		if (millis() > _lst + TO) {
-			Log.println("HTTP read timeout");
+		if ((unsigned long)(millis() - _lst) > TO) {
+			Log.printf("HTTP buff read timeout (received %u, %u to go for total of %u)\n", 
+				l, len - l, len);
 			break;
 		};
-		delay(250);
+		yield(); 
 		continue;
 	    };
             size_t left = (buffp == NULL) ? max : max - l; 
+            _lst = millis();
+            TO = 1500;
 
             if (left > sizeAvailable)
                   left = sizeAvailable;
@@ -661,8 +666,6 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
             if (n != left) {
 		Debug.println("HTTP read incomplete, retry");
             };
-            _lst = millis();
-            TO = 1500;
 
             l+=n;
   	    if (buffp == NULL)
