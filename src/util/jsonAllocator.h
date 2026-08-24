@@ -27,6 +27,12 @@ static unsigned int _max = 0;
 struct SpiRamAllocator : ArduinoJson::Allocator {
 public:
   SpiRamAllocator() : SpiRamAllocator(6 * 1024) {};
+#if 0
+  SpiRamAllocator(size_t s) { return ; };
+  void* allocate(size_t size) override { return malloc(size); };
+  void deallocate(void* ptr) override { free(ptr); };
+  void* reallocate(void* ptr, size_t new_size) override { return realloc(ptr, new_size); ;
+#else
   SpiRamAllocator(size_t s) {
 	if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
 		return;
@@ -45,7 +51,7 @@ public:
         return malloc(size);
 
     if ((unsigned char *)_ptr + size > _buff + _SIZE) {
-	Log.println("JSON Allocator - out of memory");
+	Log.printf("JSON Allocator - out of memory (%u claimed, needs %u extra)\n", _SIZE,size);
 	return NULL;
     };
 
@@ -58,12 +64,12 @@ public:
   void deallocate(void* ptr) override {
     if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
        heap_caps_free(ptr);
+
     if (!_SIZE)
        free(ptr);
 
     if (ptr != _buff)
 	return;
-
 
     if ((unsigned char *)_ptr - _buff > _max)
 	_max = (unsigned char *)_ptr - _buff;
@@ -80,13 +86,19 @@ public:
     if (!_SIZE)
         return realloc(ptr,new_size);
 
-    return allocate(new_size);
+
+    // We cannot really support a re-alloc - as we cannot change the 'mid' something
+    // pointers. All we can do is add a second block or something. Not yet implemented.
+    //
+    Log.println("JSON Allocator - unsupported realloc()");
+    return NULL;
   };
  
 private:
   size_t _SIZE = 0;
   unsigned char * _buff;
   void  * _ptr = NULL;
+#endif
 };
 extern SpiRamAllocator jsonAllocator;
 #endif
