@@ -233,12 +233,21 @@ void ACNodeRest::status(JsonObject & report) {
 void ACNodeRest::loop() {
     super::loop();
 
+    if (_stateChanged && machinestate.isStable()) {
+		_stateChanged = false;
+		reportStateChange();
+    };
+
+    // Gate the stuff that (also) does HTTP/rest -as that can be slow
+    // if the https needs to be rekeyed.
+    //
     static unsigned lst = 0;
     if (!(machinestate.isStable() && machinestate.backgroundTaskOk() && machinestate.secondsInThisState() >= 1 && millis()-lst > TAG_SEND_INTERVAL && millis() - _lastApprovalTime > 3000))
 	return;
 
     if (_unknownTagsToSentQueued) {
         const char * url = UNKTAG_URL;
+	// HTTP
 	if (_restAPI->rest(url,"tag=" + String(_unknownTagsToSent[--_unknownTagsToSentQueued]))) 
         	Debug.println("Unknown tag reported");
 	else 
@@ -294,10 +303,6 @@ void ACNodeRest::loop() {
 	lst = millis();
     };
 
-    if (_stateChanged && machinestate.isStable()) {
-		_stateChanged = false;
-		reportStateChange();
-    };
 
     // Reboot for memory fragmentation reasons; may perhaps no longer
     // be needed now that we've moved the largest block off to a file.
