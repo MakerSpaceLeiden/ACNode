@@ -4,6 +4,7 @@
 
 // Just for logging.
 #include "ACNode.h"
+#include "util/log_backtrace.h"
 
 #ifndef _jsonAllocator_H
 #define _jsonAllocator_H
@@ -52,6 +53,7 @@ public:
 
     if ((unsigned char *)_ptr + size > _buff + _SIZE) {
 	Log.printf("JSON Allocator - out of memory (%u claimed, needs %u extra)\n", _SIZE,size);
+        log_backtrace(&Debug);
 	return NULL;
     };
 
@@ -91,6 +93,7 @@ public:
     // pointers. All we can do is add a second block or something. Not yet implemented.
     //
     Log.println("JSON Allocator - unsupported realloc()");
+    log_backtrace(&Log);
     return NULL;
   };
  
