@@ -42,7 +42,7 @@ bool _debug = false;
  *   20   32                      salt for the tags
  *   52   32                      salt for the keys
  *   84   32                      IV seed for the iv used in encrypting the member names
- *  116   LT                      tag section; N entries of XX bytes = LT long
+ *  116   LT                      tag section; N entries of TAG_ENTRY_SIZE(68) bytes = LT long
  *        68      0   32          salted tag; sha256( salt || tag-as-ascii)
  *                32  32          decryption key user name; xor(salted tag, sha255( tag || key salt)
  *                64  04          Index into the member section, 4 bytes, network order
@@ -53,7 +53,7 @@ bool _debug = false;
  *                3    LES        AES-CBC, padded, ecrypted with the first 16 bytes of
  *                                sha256( iv || Index) as the iv and key from tag section.
  *
- *  116+LT+LM                      EOF
+ *  116+LT+LM                     EOF
  *
  # Tags are in ascii (not binary) format; with no leading zeros; i.e. \d{1,3}[-\d{1,3}]*
  # Example: 1-2-3-210-10
