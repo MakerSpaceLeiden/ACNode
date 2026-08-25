@@ -263,7 +263,7 @@ void setup() {
       return;
     };
 #endif
-    Log.println("Action Approved.");
+    Debug.println("Enabling machine");
     if (node.machinestate != POWERED)
       node.machinestate = ACTIVATED;
   });
