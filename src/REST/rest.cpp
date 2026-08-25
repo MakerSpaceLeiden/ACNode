@@ -506,11 +506,16 @@ rest_ret_t raw_rest_setup(const char * terminalName, const char *url,  String en
     }
     
     if (httpCode == HTTP_CODE_BAD_REQUEST) {
-        Log.printf("raw_rest: bad request; propably lost the pairing\n");
+        Log.printf("raw_rest: bad request; propably lost the pairing: %s\n", https.getString().c_str());
         ret = ERR_REPAIR;
         goto exit;
     }
-    
+
+    if (httpCode == HTTP_CODE_CONFLICT) {
+        Log.printf("raw_rest: confict: %s\n", https.getString().c_str());
+        ret = NOERROR; // mark as ok - as this is generally when we resubmit the same data (e.g. on second swipe)
+        goto exit;
+    }
     
     if (httpCode == HTTP_CODE_NOT_FOUND) {
         Log.printf("raw_rest: not-found: %s(%d): %s\n", https.errorToString(httpCode).c_str(), httpCode, https.getString().c_str());
