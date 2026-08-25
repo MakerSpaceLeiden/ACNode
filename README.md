@@ -135,10 +135,11 @@ If needed - create a file such as
 and include a statement such as
 
         compiler.cpp.extra_flags=-imacros/Users/username/.local-config.h
+        compiler.c.extra_flags=-imacros/Users/username/.local-config.h
 
 to include any #define's to override the default ones. E.g. for the WIFI and OTA passwords used.
 
-An example set is shown below. 
+An example for this ``.local-config.h`` file is shown below.:
 
         #ifndef _H_LOCAL_CONFIG
         #define _H_LOCAL_CONFIG
