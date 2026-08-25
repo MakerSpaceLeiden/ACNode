@@ -540,7 +540,7 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
     size_t len = https.getSize();
 
     unsigned long _lst = millis(), TO = 10*100, l = 0;
-    for(;l<len;) {
+    for(;l<len && len != -1;) {
 	    if (!stream->connected()) {
                 if (len != -1) {
                    Log.println("Connection closed unexpectedly");
@@ -550,7 +550,7 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
             };
 
       	    int sizeAvailable = stream->available();
-            if (sizeAvailable == 0) {
+            if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
 			Log.printf("HTTP raw read timeout (received %u, %u to go for total of %u)\n", 
 				l, len - l, len);
@@ -572,6 +572,9 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
 
             int n = stream->readBytes(buff, left);
             if (n <= 0) {
+		if (len == -1)
+			break;
+
 		Log.println("HTTP read error");
                 ret = ERR_RETRYABLE;
 		break;
@@ -634,7 +637,7 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
         WiFiClient * stream = https.getStreamPtr();
         l = 0;
         unsigned long _lst = millis(), TO = 10*1000;
-        for(unsigned char * p = buff;;) {
+        for(unsigned char * p = buff; l < len && len != -1;) {
 	    if (!stream->connected()) {
                 if (len != -1)
                    Log.println("Connection closed unexpectedly");
@@ -642,7 +645,7 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
             };
 
       	    int sizeAvailable = stream->available();
-            if (sizeAvailable == 0) {
+            if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
 			Log.printf("HTTP buff read timeout (received %u, %u to go for total of %u)\n", 
 				l, len - l, len);
@@ -660,6 +663,9 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
 
             int n = stream->readBytes(p, left);
             if (n <= 0) {
+		if (len == -1)
+			break;
+
 		Log.println("HTTP read error");
 		break;
 	    };
