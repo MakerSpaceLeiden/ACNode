@@ -27,13 +27,14 @@ static unsigned int _max = 0;
 //
 struct SpiRamAllocator : ArduinoJson::Allocator {
 public:
-  SpiRamAllocator() : SpiRamAllocator(6 * 1024) {};
-#if 0
+#if 1
+  SpiRamAllocator() { return ;};
   SpiRamAllocator(size_t s) { return ; };
   void* allocate(size_t size) override { return malloc(size); };
   void deallocate(void* ptr) override { free(ptr); };
-  void* reallocate(void* ptr, size_t new_size) override { return realloc(ptr, new_size); ;
+  void* reallocate(void* ptr, size_t new_size) override { return realloc(ptr, new_size); };
 #else
+  SpiRamAllocator() : SpiRamAllocator(6 * 1024) {};
   SpiRamAllocator(size_t s) {
 	if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
 		return;

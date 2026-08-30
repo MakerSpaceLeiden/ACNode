@@ -557,7 +557,7 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
       	    int sizeAvailable = stream->available();
             if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
-			Log.printf("HTTP raw read timeout (received %u, %u to go for total of %u)\n", 
+			Log.printf("HTTP raw read timeout (received %lu, %lu to go for total of %u)\n", 
 				l, len - l, len);
                         ret = ERR_RETRYABLE;
 			break;
@@ -652,7 +652,7 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
       	    int sizeAvailable = stream->available();
             if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
-			Log.printf("HTTP buff read timeout (received %u, %u to go for total of %u)\n", 
+			Log.printf("HTTP buff read timeout (received %lu, %lu to go for total of %u)\n", 
 				l, len - l, len);
 			break;
 		};

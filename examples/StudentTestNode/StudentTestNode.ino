@@ -60,8 +60,8 @@
 #endif
 const char ota_password_hash[] = OTA_PASSWD_HASH256;
 
-auto node = WhiteNodev108(MACHINE);
-// auto node = BlueNodev114(MACHINE);
+// auto node = WhiteNodev108(MACHINE);
+auto node = BlueNodev114(MACHINE);
 
 unsigned long bad_poweroff = 0, normal_poweroff = 0, normal_poweron = 0, idle_poweroff = 0;
 

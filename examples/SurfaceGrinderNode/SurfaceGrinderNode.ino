@@ -43,7 +43,7 @@
 
 // One of the 3-phase wires to the motor runs through this current coil.
 #define MOTOR_CURRENT (node.CURR0)
-#define CURR_TRESHOLD (200)
+#define CURR_TRESHOLD (100)
 
 // Generate with 'echo -n Password | openssl md5 or
 // use https://www.md5hashgenerator.com/. No \0,
@@ -61,7 +61,7 @@ const char ota_password_hash[] = OTA_PASSWD_HASH256;
 BlueNodev114 node = BlueNodev114(MACHINE);
 IODebounce *motorCurrent = NULL;
 
-const unsigned int MAX_SECS_IDLE = 3600;
+const unsigned int MAX_SECS_IDLE = 15*60;
 
 // Extra state above 'POWERED' - when the saw is spinning (detected via the motorCurrent) as
 // opposed to the safety circuitry being powered (i.e. relay has closed, so the interlock
@@ -94,9 +94,11 @@ void setup() {
   expandedPinMode(RELAY_GPIO, OUTPUT);
   node.setMonitoredOutput(RELAY_GPIO, 0);
 
-  // Set an idle poweroff when the machine is on; but the motor is not running.
+  // Set 15 mins idle poweroff when the machine is on; but the motor is not running.
   // But if the motor is running - we set NEVER.
+  //
   node.machinestate.setTimeout(POWERED, MAX_SECS_IDLE * 1000);
+
   RUNNING = node.machinestate.addState("Running", LED::LED_ON,
                                        MachineState::NEVER, MachineState::WAITINGFORCARD, false);
 
@@ -134,11 +136,19 @@ void setup() {
   node.setOnChangeCallback(MachineState::ALL_STATES, [](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
     if (current == POWERED) {
       node.updateDisplay("OFF", "", true);  // only show off when you can actually do off.
-      node.updateDisplayStateMsg("ON", 2);
+      node.updateDisplayStateMsg(node.lastApproved()->displayName(), 1);
+      node.updateDisplayStateMsg("ON - not running", 2);
     };
     if (current == RUNNING) {
+      node.updateDisplayStateMsg(node.lastApproved()->displayName(), 1);
       node.updateDisplayStateMsg("RUNNING", 2);
     };
+  });
+
+  node.setMenuCallback([](const int newState) -> bool {
+    if (node.machinestate >= POWERED)
+      return true;  // prevent menu interaction while running
+    return false;
   });
 
   node.setOffCallback([](const int newState) -> bool {
@@ -148,6 +158,20 @@ void setup() {
     node.machinestate = MachineState::WAITINGFORCARD;
     Log.println("Powered off after user button press");
     return true;
+  });
+
+  // We allow 'taking over this machine while it is on' -- hence this check for
+  // if it is powered; and in that case -also- accepting a new approval.
+  node.onApproval([](const char *machine) {
+    if ((node.machinestate == MachineState::WAITINGFORCARD) || (node.machinestate == MachineState::CHECKINGCARD))
+      node.machinestate = POWERED;
+    else if (node.machinestate == POWERED || node.machinestate == RUNNING)
+      Debug.printf("Machine handed over to user %s", node.lastApproved()->name);
+    else {
+      Log.printf("Unexpected approval for %s. Ignoring.", node.lastApproved()->name);
+      node.buzzerErr();
+      return;
+    };
   });
 
   Log.printf("Starting loop(): %s " __DATE__ " " __TIME__ "\n", FILE2FIRMWARE(__FILE__));

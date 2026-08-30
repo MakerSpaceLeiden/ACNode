@@ -82,7 +82,7 @@ public:
         OPTO1 = 35;
         CURR0 = 36; // SENSOR_VN
         CURR1 = 37; // SENSOR_VP
-        BUZZER = 2;
+        BUZZER = 02;
         
         STEP_DIR = OUT1;
         STEP_STEP = OUT0;
