@@ -45,7 +45,6 @@ public:
     inline unsigned long getLastUpdate() { return last_update; };
 
     ApprovalEntry * getEntry(const char * tag);
-
 private:
     RestAPI * _restAPI = NULL;
     const char * machine;

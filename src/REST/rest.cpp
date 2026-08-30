@@ -506,11 +506,16 @@ rest_ret_t raw_rest_setup(const char * terminalName, const char *url,  String en
     }
     
     if (httpCode == HTTP_CODE_BAD_REQUEST) {
-        Log.printf("raw_rest: bad request; propably lost the pairing\n");
+        Log.printf("raw_rest: bad request; propably lost the pairing: %s\n", https.getString().c_str());
         ret = ERR_REPAIR;
         goto exit;
     }
-    
+
+    if (httpCode == HTTP_CODE_CONFLICT) {
+        Log.printf("raw_rest: confict: %s\n", https.getString().c_str());
+        ret = NOERROR; // mark as ok - as this is generally when we resubmit the same data (e.g. on second swipe)
+        goto exit;
+    }
     
     if (httpCode == HTTP_CODE_NOT_FOUND) {
         Log.printf("raw_rest: not-found: %s(%d): %s\n", https.errorToString(httpCode).c_str(), httpCode, https.getString().c_str());
@@ -540,7 +545,7 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
     size_t len = https.getSize();
 
     unsigned long _lst = millis(), TO = 10*100, l = 0;
-    for(;l<len;) {
+    for(;l<len && len != -1;) {
 	    if (!stream->connected()) {
                 if (len != -1) {
                    Log.println("Connection closed unexpectedly");
@@ -550,9 +555,9 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
             };
 
       	    int sizeAvailable = stream->available();
-            if (sizeAvailable == 0) {
+            if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
-			Log.printf("HTTP raw read timeout (received %u, %u to go for total of %u)\n", 
+			Log.printf("HTTP raw read timeout (received %lu, %lu to go for total of %u)\n", 
 				l, len - l, len);
                         ret = ERR_RETRYABLE;
 			break;
@@ -572,6 +577,9 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
 
             int n = stream->readBytes(buff, left);
             if (n <= 0) {
+		if (len == -1)
+			break;
+
 		Log.println("HTTP read error");
                 ret = ERR_RETRYABLE;
 		break;
@@ -634,7 +642,7 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
         WiFiClient * stream = https.getStreamPtr();
         l = 0;
         unsigned long _lst = millis(), TO = 10*1000;
-        for(unsigned char * p = buff;;) {
+        for(unsigned char * p = buff; l < len && len != -1;) {
 	    if (!stream->connected()) {
                 if (len != -1)
                    Log.println("Connection closed unexpectedly");
@@ -642,9 +650,9 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
             };
 
       	    int sizeAvailable = stream->available();
-            if (sizeAvailable == 0) {
+            if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
-			Log.printf("HTTP buff read timeout (received %u, %u to go for total of %u)\n", 
+			Log.printf("HTTP buff read timeout (received %lu, %lu to go for total of %u)\n", 
 				l, len - l, len);
 			break;
 		};
@@ -660,6 +668,9 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
 
             int n = stream->readBytes(p, left);
             if (n <= 0) {
+		if (len == -1)
+			break;
+
 		Log.println("HTTP read error");
 		break;
 	    };

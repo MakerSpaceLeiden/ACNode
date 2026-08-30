@@ -38,6 +38,14 @@
   or 3) cutting (building) power. The fire-alarm sensor is wired into the emergecy button circuit.
 
 */
+#ifndef ARDUINO_ESP32_WROOM_DA
+#error "Black/Blue Hardware is expected to be an ESP32 WROOM-DA"
+#endif
+
+#ifndef ARDUINO_PARTITION_min_spiffs
+#error "Unexpected partition table; may break OTA"
+#endif
+
 #include <WhiteNodev108.h>
 
 #ifndef MACHINE
@@ -52,7 +60,7 @@
 //
 // #define OTA_PASSWD_MD5  "0f475732f6c1a632b3e161160be0cfc5" // the MD5 of "SomethingSecrit"
 
-#ifndef OTA_PASSWD_HASH
+#ifndef OTA_PASSWD_HASH256
 #error "An OTA password MUST be set as an MD5. Sorry."
 #endif
 
@@ -87,7 +95,7 @@
 // and is wired into the same 3P+N+E power as the oven itself. We need
 // to change this to get the 12 volt we need for reliable kWh measuring.
 //
-WhiteNodev108 node = WhiteNodev108(MACHINE, WIFI_NETWORK, WIFI_PASSWD);
+WhiteNodev108 node = WhiteNodev108(MACHINE);
 
 // Extra state above 'POWERED' - when the pottery oven is in use as
 // opposed to the safety circuitry being powered.
@@ -99,7 +107,7 @@ IODebounce *safetyDetect, *ovenCurrent, *vk2000detect;
 unsigned long startWhCounter = 0;
 volatile unsigned long whCounter = 0;
 void IRAM_ATTR irqWattHourPulse() {
-  whCounter++;
+  whCounter = whCounter + 1;
 }
 
 void setup() {
@@ -168,7 +176,7 @@ void setup() {
   ovenCurrent = new IODebounce("OvenCurrent", OVEN_CURRENT);
   ovenCurrent->setAnalogThreshold(600);
   ovenCurrent->setCallback([](const int newState) {
-    Log.printf("Current to heating coil now %s\n", newState ? "OFF" : "ON"); 
+    Log.printf("Current to heating coil now %s\n", newState ? "OFF" : "ON");
   });
 
   node.setOffCallback([](const int newState) -> bool {
@@ -183,8 +191,7 @@ void setup() {
       node.updateDisplayStateMsg("then prs OFF", 3);
       node.buzzerErr();
       return true;
-    } else
-    if (node.machinestate == POWERED) {
+    } else if (node.machinestate == POWERED) {
       Log.println("Switching OFF power");
 
       // Break the safety interlock to power everything off. The
@@ -205,9 +212,7 @@ void setup() {
   },
                       ONLOW);
 
-  node.setOTAPasswordHash(OTA_PASSWD_HASH);
-  node.set_mqtt_prefix("ac");
-  node.set_master("master");
+  node.setOTAPasswordHash(OTA_PASSWD_HASH256);
 
   node.onReport([](JsonObject report) {
     report["WhCounter"] = whCounter;

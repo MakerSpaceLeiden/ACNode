@@ -4,6 +4,7 @@
 
 // Just for logging.
 #include "ACNode.h"
+#include "util/log_backtrace.h"
 
 #ifndef _jsonAllocator_H
 #define _jsonAllocator_H
@@ -26,13 +27,14 @@ static unsigned int _max = 0;
 //
 struct SpiRamAllocator : ArduinoJson::Allocator {
 public:
-  SpiRamAllocator() : SpiRamAllocator(6 * 1024) {};
-#if 0
+#if 1
+  SpiRamAllocator() { return ;};
   SpiRamAllocator(size_t s) { return ; };
   void* allocate(size_t size) override { return malloc(size); };
   void deallocate(void* ptr) override { free(ptr); };
-  void* reallocate(void* ptr, size_t new_size) override { return realloc(ptr, new_size); ;
+  void* reallocate(void* ptr, size_t new_size) override { return realloc(ptr, new_size); };
 #else
+  SpiRamAllocator() : SpiRamAllocator(6 * 1024) {};
   SpiRamAllocator(size_t s) {
 	if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
 		return;
@@ -52,6 +54,7 @@ public:
 
     if ((unsigned char *)_ptr + size > _buff + _SIZE) {
 	Log.printf("JSON Allocator - out of memory (%u claimed, needs %u extra)\n", _SIZE,size);
+        log_backtrace(&Debug);
 	return NULL;
     };
 
@@ -91,6 +94,7 @@ public:
     // pointers. All we can do is add a second block or something. Not yet implemented.
     //
     Log.println("JSON Allocator - unsupported realloc()");
+    log_backtrace(&Log);
     return NULL;
   };
  

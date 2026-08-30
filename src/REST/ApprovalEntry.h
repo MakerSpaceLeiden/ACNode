@@ -52,6 +52,12 @@ public:
     char uid[MAX_AE_UID] = "\0";
     acl_t has =0, needs = 0;
 
+    char * displayName() {
+	if (*shortName)
+		return shortName;
+	return name;
+    };
+
     bool ok() { return (has & needs) == needs; };
 
     const char * status() {
