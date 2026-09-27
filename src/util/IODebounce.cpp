@@ -49,6 +49,10 @@ unsigned short IODebounce::raw() {
     return this->_digitalRead(_pin);
 }; 
 
+unsigned short IODebounce::rawAnalog() {
+        return this->_analogRead(_pin);
+};
+
 bool IODebounce::state(){
     return _lastStateBtn;
 }

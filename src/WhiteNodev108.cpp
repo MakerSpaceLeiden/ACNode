@@ -290,7 +290,7 @@ void WhiteNodev108::begin(bool hasDisplay) {
         };
     },  IODebounce::CBCT_CHANGE);
     addHandler(menuButton);
-    //machinestate.setOnChangeCallback(MachineState::ALL_STATES, [&](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
+    //machinestate.setOnChangeCallback(MachineState::ALL_STATES, [&](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void 
     machinestate.addOnChangeCallback(MachineState::ALL_STATES, [&](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
         Debug.printf("%s: Changing state (%d->%d): %s\n", name(), last, current, machinestate.label());
 
@@ -330,6 +330,30 @@ void WhiteNodev108::begin(bool hasDisplay) {
     });
     
     if (_reader) _reader->onSwipe([&](const char *tag) -> ACBase::cmd_result_t {
+	return processSwipe(tag);
+    });
+    
+    onConnect([&]() {
+        machinestate = PAIRING;
+    });
+    onDisconnect([&]() {
+        machinestate = MachineState::NOCONN;
+    });
+    onError([&](acnode_error_t err) {
+        Log.printf("Error %d\n", err);
+        machinestate = MachineState::TRANSIENTERROR;
+    });
+    
+    onDenied([&](const char *reason) {
+        _lasterrmsg = reason;
+        machinestate = MachineState::REJECTED;
+    });
+    
+    updateDisplay("","MORE", true);
+    super::begin(BOARD_NG);
+}
+
+ACBase::cmd_result_t WhiteNodev108::processSwipe(const char *tag) {
         buzzerOk();
         
         ACBase::cmd_result_t ret;
@@ -364,27 +388,7 @@ void WhiteNodev108::begin(bool hasDisplay) {
             return _swipeCB(tag);
      
         return ACBase::CMD_DECLINE;
-    });
-    
-    onConnect([&]() {
-        machinestate = PAIRING;
-    });
-    onDisconnect([&]() {
-        machinestate = MachineState::NOCONN;
-    });
-    onError([&](acnode_error_t err) {
-        Log.printf("Error %d\n", err);
-        machinestate = MachineState::TRANSIENTERROR;
-    });
-    
-    onDenied([&](const char *reason) {
-        _lasterrmsg = reason;
-        machinestate = MachineState::REJECTED;
-    });
-    
-    updateDisplay("","MORE", true);
-    super::begin(BOARD_NG);
-}
+    }
 
 void WhiteNodev108::updateDisplay(const char *left, const char *right, bool rebuildFull) {
     if (_display)
@@ -513,17 +517,14 @@ void WhiteNodev108::setMonitoredOutput(uint8_t num, bool val) {
                            
 bool WhiteNodev108::getMonitoredOutput(uint8_t num) {
     xpinMode(num,INPUT);
-    bool out = digitalRead(num);
+    bool curr = xdigitalRead(num);
     xpinMode(num,OUTPUT);
-    return out;
+    return curr;
 }      
                 
 bool WhiteNodev108::monitoredOutputIsOK(uint8_t num) {
     bool expect = (num == OUT0) ? expectOut1 : expectOut2;
-        
-    xpinMode(num,INPUT);
-    bool curr = xdigitalRead(num);
-    xpinMode(num,OUTPUT);
+    bool curr = getMonitoredOutput(num);
         
     return expect == curr;
 }     

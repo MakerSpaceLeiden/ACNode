@@ -22,15 +22,25 @@
    https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_lintzaag
 
    2025/02/10 - changes freom a 1.08 white not to a newer blue board
+   2026/09/27 - changes for OLGA
 */
 #include <BlueNodev114.h>
+
+
+#ifndef ARDUINO_ESP32_WROOM_DA
+#error "Black/Blue Hardware is expected to be an ESP32 WROOM-DA"
+#endif
+
+#ifndef ARDUINO_PARTITION_min_spiffs
+#error "Unexpected partition table; may break OTA"
+#endif
 
 #ifndef MACHINE
 #define MACHINE "jointer"
 #endif
 
-#define INTERLOCK (node.OPTO0)  // Detect voltage on the interlock/safety contactor.
-// #define ONOFFSWITCH   (node.OPTO1) // Detects voltage on the normally-closed circuit of the front switch.
+#define ONOFFSWITCH (node.OPTO0)    // Detects voltage on the start; that should be there after interlock enable
+#define INTERLOCK (node.OPTO1)      // Detects that the safety relay is engaged (or not)
 #define MOTOR_CURRENT (node.CURR0)  // One of the 3-phase wires to the motor runs through this current coil.
 
 // The relay that sits in the safety interlock of
@@ -54,13 +64,13 @@ BlueNodev114 node = BlueNodev114(MACHINE);
 
 unsigned long bad_poweroff = 0, normal_poweroff = 0, normal_poweron = 0, idle_poweroff = 0;
 
-IODebounce *interlockDetect, *motorCurrent, *onoffSwitchDetect;
+IODebounce *interlockDetect, *motorCurrent;
 
 // Extra state - when the safety contactor has actually been unlocked
 // but the RED button has not been pressed yet.
 //
 MachineState::machinestate_t ACTIVATED;
-const unsigned int MAX_SECS_WAIT_FOR_RED_BUTTON = 100;
+const unsigned int MAX_SECS_WAIT_FOR_BUTTON = 10;
 
 // Extra state above 'POWERED' - when the saw is spinning (detected via the motorCurrent) as
 // opposed to the safety circuitry being powered (i.e. relay has closed, so the interlock
@@ -70,11 +80,13 @@ const unsigned int MAX_SECS_WAIT_FOR_RED_BUTTON = 100;
 MachineState::machinestate_t RUNNING;
 const unsigned int MAX_SECS_IDLE = 3600;
 
+#ifdef AKWARD_BUTTON_POSITION
 // Extra state af the user has pressed the green button to de-activate the safety
 // interlock. To both separate the events for EMC reasons and make the shutdown
 // process more explicit/give the users time to change their mind.
 //
 MachineState::machinestate_t SHUTTINGDOWN;
+#endif
 
 #ifdef ONOFFSWITCH
 IODebounce *onoffSwitchDetect;
@@ -127,25 +139,27 @@ void setup() {
   node.setMonitoredOutput(RELAY_GPIO, 0);
 
   ACTIVATED = node.machinestate.addState("Waiting 4 Safety", LED::LED_ON,
-                                         MAX_SECS_WAIT_FOR_RED_BUTTON * 1000, MachineState::WAITINGFORCARD, false);
+                                         MAX_SECS_WAIT_FOR_BUTTON * 1000, MachineState::WAITINGFORCARD, false);
   RUNNING = node.machinestate.addState("Saw Running", LED::LED_ON,
                                        MachineState::NEVER, MachineState::WAITINGFORCARD, false);
+#ifdef AKWARD_BUTTON_POSITION
   SHUTTINGDOWN = node.machinestate.addState("Locking machine",
-                                            LED::LED_ON, 60 * 1000, MachineState::WAITINGFORCARD, false);
-
+                                            LED::LED_ON, MAX_SECS_WAIT_FOR_BUTTON * 1000, MachineState::WAITINGFORCARD, false);
+#endif
 
 #ifdef ONOFFSWITCH
   expandedPinMode(ONOFFSWITCH, INPUT);
-  onoffSwitchDetect = new IODebounce(ONOFFSWITCH);
+  onoffSwitchDetect = new IODebounce("OnOffDetect", ONOFFSWITCH);
   node.addHandler(onoffSwitchDetect);
 
-  UNSAFE = node.machinestate.addState("Blocked, switch=ON",
+  UNSAFE = node.machinestate.addState("Blockd, OpSwtch=ON",
                                       LED::LED_ON,
                                       MachineState::NEVER, MachineState::NEVER, false);
+
   onoffSwitchDetect->setCallback([](const int newState) {
-    if (node.machinestate == MachineState::WAITINGFORCARD && newState) {
+    if (node.machinestate > MachineState::WAITINGFORCARD && newState) {
       Log.println("OnOff switch in the unsafe 'on' position; locking machine");
-      node.machinestate = UNSAFE;
+      // node.machinestate = UNSAFE;
     };
     if (node.machinestate == UNSAFE && !newState) {
       Log.println("OnOff switch in the right, off, position again");
@@ -155,7 +169,7 @@ void setup() {
 #endif
 
   expandedPinMode(INTERLOCK, INPUT);
-  interlockDetect = new IODebounce(INTERLOCK);
+  interlockDetect = new IODebounce("GreenOnDetect", INTERLOCK);
   node.addHandler(interlockDetect);
 
   interlockDetect->setCallback([](const int newState) {
@@ -172,7 +186,11 @@ void setup() {
       bad_poweroff++;
     } else if (node.machinestate == POWERED && newState == HIGH) {
       Log.println("Normal poweroff with the green button.");
+#ifdef AKWARD_BUTTON_POSITION
       node.machinestate = SHUTTINGDOWN;
+#else
+      node.machinestate = MachineState::WAITINGFORCARD;
+#endif
       normal_poweroff++;
     } else if (node.machinestate == ACTIVATED && newState == LOW) {
       Log.println("Normal poweron with the red button.");
@@ -180,10 +198,9 @@ void setup() {
       normal_poweron++;
     } else
       Debug.printf("Interlock power now %s (State: %s)\n", newState ? "OFF" : "ON", node.machinestate.label());
-  },
-                               CHANGE);
+  });
 
-  motorCurrent = new IODebounce(MOTOR_CURRENT);
+  motorCurrent = new IODebounce("MotorCurrent", MOTOR_CURRENT);
   motorCurrent->setAnalogThreshold(30);  // Was 600
   node.addHandler(motorCurrent);
 
@@ -198,8 +215,7 @@ void setup() {
       Log.printf("Alert: Unexpected change in motor current; state is %s and the current is %s\n",
                  node.machinestate.label(), newState ? "ON" : "OFF");
     }
-  },
-                            CHANGE);
+  });
 
 
   node.setOTAPasswordHash(ota_password_hash);
@@ -227,8 +243,10 @@ void setup() {
       // the RED/Green on/off button of the safety contactor.
       node.updateDisplay("", "", true);
     };
-    if (current == POWERED)
-      node.updateDisplayStateMsg("RED @back 4 off", 2);
+    if (current == POWERED) {
+      node.updateDisplayStateMsg("Press RED", 2);
+      node.updateDisplayStateMsg("for OFF", 3);
+    };
   });
 
   node.onApproval([](const char *machine) {
@@ -239,8 +257,10 @@ void setup() {
     if ((node.machinestate != POWERED) &&
         (node.machinestate != MachineState::WAITINGFORCARD) &&
         (node.machinestate != MachineState::CHECKINGCARD) &&
-        (node.machinestate != ACTIVATED) &&
-        (node.machinestate != SHUTTINGDOWN)
+#ifdef AKWARD_BUTTON_POSITION
+        (node.machinestate != SHUTTINGDOWN) &&
+#endif
+        (node.machinestate != ACTIVATED)
        ) {
       Log.println("Unexpected state - Approved action ignored");
       node.buzzerErr();
@@ -258,28 +278,44 @@ void setup() {
 void loop() {
   node.loop();
 
-  if (node.machinestate == ACTIVATED || node.machinestate == SHUTTINGDOWN) {
+  if (node.machinestate == ACTIVATED
+#ifdef AKWARD_BUTTON_POSITION
+      || node.machinestate == SHUTTINGDOWN
+#endif
+  ) {
     static unsigned long lst = millis();
     if (millis() - lst > 1000) {
       lst = millis();
+#ifdef AKWARD_BUTTON_POSITION
       if (node.machinestate == SHUTTINGDOWN)
         node.updateDisplayStateMsg("in", 1);
       else
-        node.updateDisplayStateMsg("Prss GREEN @ back", 1);
+#endif
+        node.updateDisplayStateMsg("Press GREEN", 1);
 
-      node.updateDisplayStateMsg(node.machinestate.timeLeftInThisState(), 2);
+      node.updateDisplayStateMsg(node.machinestate.timeLeftInThisState().c_str(), 2);
     }
   };
 
   if (node.machinestate == ACTIVATED && node.machinestate.secondsInThisState() > MAX_SECS_IDLE) {
     Log.println("Power off after beeing idle too long.");
     node.buzzerErr();
+#ifdef AKWARD_BUTTON_POSITION
     node.machinestate = SHUTTINGDOWN;
+#else
+    node.machinestate = MachineState::WAITINGFORCARD;
+#endif
     idle_poweroff++;
   };
 
   node.setMonitoredOutput(RELAY_GPIO,
-                          ((node.machinestate == POWERED) || (node.machinestate == RUNNING) || (node.machinestate == ACTIVATED) || (node.machinestate == SHUTTINGDOWN)) ? HIGH : LOW);
+                          ((node.machinestate == POWERED) || (node.machinestate == RUNNING) ||
+#ifdef AKWARD_BUTTON_POSITION
+                           (node.machinestate == SHUTTINGDOWN)
+#endif
+                             (node.machinestate == ACTIVATED))
+                            ? HIGH
+                            : LOW);
 
   static unsigned long lst = millis();
   if (millis() - lst > 10 * 1000) {
@@ -292,4 +328,4 @@ void loop() {
                  MOTOR_CURRENT, motorCurrent->raw(), motorCurrent->state() ? "On " : "Off", motorCurrent->rawState(),
                  INTERLOCK, interlockDetect->raw(), interlockDetect->state() ? "On " : "Off", interlockDetect->rawState());
   }
-  }
+}

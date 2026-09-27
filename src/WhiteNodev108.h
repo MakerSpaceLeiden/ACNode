@@ -137,6 +137,8 @@ public:
     void addDeck(Deck * deck);
     Deck * currentDeck() { return _deskCtrl->current(); };
 
+    // Temp addition/for CI/CD test automation
+    ACBase::cmd_result_t processSwipe(const char *tag);
     
     // From 1.11 nodes have an internal overwrite switch/jumper. When setting it
     // using this method - the main loop will monitor for this switch or jumper

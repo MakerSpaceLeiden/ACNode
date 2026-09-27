@@ -24,6 +24,7 @@ OTA::OTA(const char * password) : _ota_password_hash(password) {
 
 void OTA::begin() {
     ArduinoOTA.setHostname((_acnodebase->moi[0]) ? _acnodebase->moi : "unset-acnode");
+    ArduinoOTA.setTimeout(6000);
     
     ArduinoOTA.onStart([]() {
         Log.println("OTA process started (trusting though - not wiping private keys).");
@@ -93,6 +94,8 @@ OTAWithDisplay::OTAWithDisplay(const char * password, Display *d, const char * h
 void OTAWithDisplay::begin() {
     const char * name = ((_hostname != NULL) && (_hostname[0] != '\0')) ? _hostname : "unset-acnode";
     ArduinoOTA.setHostname(name);
+    ArduinoOTA.setTimeout(6000);
+
 
     ArduinoOTA.onStart([&]() {
         if (_ota_ok_cb && !_ota_ok_cb()) {

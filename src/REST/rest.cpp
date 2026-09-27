@@ -231,9 +231,11 @@ rest_ret_t registerDevice(const char * terminalName) {
     https.setTimeout(HTTP_TIMEOUT);
     https.setUserAgent(terminalName);
     
-    Debug.printf("RegisterDevice Fetch <%s> for terminal <%s>\n", buff, terminalName);
+    // Log.printf("RegisterDevice , core %x, url %s\n",xPortGetCoreID(),(char *)buff);
+
+    Debug.printf("RegisterDevice Fetch for terminal %s\n", terminalName);
     httpCode =  https.GET();
-    
+ 
     peer = client.getPeerCertificate();
     if (!peer || peer->raw.len <= 0) {
         Log.println("No peer certificate, Aborting");
@@ -299,10 +301,6 @@ rest_ret_t registerDeviceSwipe(const char * terminalName, const char * tag) {
     unsigned char tmp[128], buff[1024], sha256[256 / 8];
     rest_ret_t ret = ERR_FATAL;
     
-    client.setCACert(ca_root);
-    client.setCertificate(client_cert_as_pem);
-    client.setPrivateKey(client_key_as_pem);
-    
     updateDisplay_progressText("sending credentials");
     
     // Create the reply; SHA256(nonce, tag(secret), client, server);
@@ -338,14 +336,41 @@ rest_ret_t registerDeviceSwipe(const char * terminalName, const char * tag) {
         Debug.println((char *)tmp);
     };
     
+    // Kludge - We sometimes see a DNS lookup returing the right A
+    // record; but client having a 0.0.0. milli()seconds later. So
+    // for now - we avoid using the static HTTP/shared instances.
+    //
+    // https.end(); client.stop(); 
+
+    //  Log.printf("RegisterSwipe, core %x, url %s\n",xPortGetCoreID(),(char *)buff);
+    client.setCACert(ca_root);
+    client.setCertificate(client_cert_as_pem);
+    client.setPrivateKey(client_key_as_pem);
+
     if (!https.begin(client, (char *)buff )) {
         Log.println("Failed to begin https");
         goto exit;
     };
-    
-    httpCode =  https.GET();
-    
+    https.setTimeout(HTTP_TIMEOUT);
+    https.setUserAgent(terminalName);
+
+    httpCode = https.GET();
+    if (httpCode <= 0) {
+	Log.printf("Get failed, error %s (%s)\n", https.errorToString(httpCode).c_str(), buff);
+        ret = ERR_REPAIR;
+        goto exit;
+    };
     peer = client.getPeerCertificate();
+    if (!peer) {
+        Log.printf("Server did not set a peer cert (%s, Status: %s)\n",buff,  https.errorToString(httpCode));
+        ret = ERR_REPAIR;
+        goto exit;
+    };
+    if (NULL == peer->raw.p || 0 == peer->raw.len) {
+        Log.println("Server did not provide peer cert data.");
+        ret = ERR_REPAIR;
+        goto exit;
+    };
     mbedtls_sha256(peer->raw.p, peer->raw.len, tmp, 0);
 
     if (memcmp(tmp, sha256_server, 32)) {

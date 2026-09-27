@@ -34,7 +34,7 @@
 
 //#define OTA_PASSWD_MD5  "0f475732f6c1a632b3e161160be0cfc5" // the MD5 of "SomethingSecrit"
 
-#ifndef OTA_PASSWD_HASH
+#ifndef OTA_PASSWD_HASH256
 #error "An OTA password MUST be set as a MD5. Sorry."
 // Generate with 'echo -n Password | openssl md5 or
 // use https://www.md5hashgenerator.com/. No \0,
@@ -130,7 +130,7 @@ void setup() {
     }
   });
 
-  node.setOTAPasswordHash(OTA_PASSWD_HASH);
+  node.setOTAPasswordHash(OTA_PASSWD_HASH256);
   node.set_mqtt_prefix("ac");
   node.set_master("master");
 
