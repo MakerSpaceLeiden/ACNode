@@ -19,15 +19,14 @@
 
   QR code shown:
 
-   https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_studenttest
+   https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_lintzaag
 
    2025/02/10 - changes freom a 1.08 white not to a newer blue board
 */
 #include <BlueNodev114.h>
-#include <HTTPClient.h>
 
 #ifndef ARDUINO_ESP32_WROOM_DA
-#error "Black/Blue/White Hardware is expected to be an ESP32 WROOM-DA"
+#error "Black/Blue Hardware is expected to be an ESP32 WROOM-DA"
 #endif
 
 #ifndef ARDUINO_PARTITION_min_spiffs
@@ -35,14 +34,14 @@
 #endif
 
 #ifndef MACHINE
-#define MACHINE "studenttest"  // Student test/demo node
+#define MACHINE "pedestalgrinder"  // tafelcircelzaag
 #endif
 
-#define INTERLOCK (node.OPTO0)  // Detect voltage on the interlock/safety contactor.
+#define INTERLOCK (node.OPTO0)      // Detect voltage on the interlock/safety contactor.
 // #define ONOFFSWITCH (node.OPTO1)    // Detects voltage on the normally-closed circuit of the front switch.
-// #define MOTOR_CURRENT (node.CURR0)  // One of the 3-phase wires to the motor runs through this current coil.
+#define MOTOR_CURRENT (node.CURR0)  // One of the 3-phase wires to the motor runs through this current coil.
 
-#define CURR_TRESHOLD (200)  // for full delta running; not star
+#define CURR_TRESHOLD (200)  // only star; no delta.
 
 // The relay that sits in the safety interlock of
 // the contactor at the back-bottom of the saw.
@@ -61,20 +60,11 @@
 #endif
 const char ota_password_hash[] = OTA_PASSWD_HASH256;
 
-// auto node = WhiteNodev108(MACHINE);
-auto node = BlueNodev114(MACHINE);
+BlueNodev114 node = BlueNodev114(MACHINE);
 
 unsigned long bad_poweroff = 0, normal_poweroff = 0, normal_poweron = 0, idle_poweroff = 0;
 
-#ifdef INTERLOCK
-IODebounce *interlockDetect;
-#endif
-#ifdef MOTOR_CURRENT
-IODebounce *motorCurrent;
-#endif
-#ifdef INTERLOCK
-IODebounce *onoffSwitchDetect;
-#endif
+IODebounce *interlockDetect, *motorCurrent;
 
 // Extra state - when the safety contactor has actually been unlocked
 // but the RED button has not been pressed yet.
@@ -97,11 +87,11 @@ const unsigned int MAX_SECS_IDLE = 3600;
 MachineState::machinestate_t SHUTTINGDOWN;
 
 #ifdef ONOFFSWITCH
-IODebounce *onoffSwitchDetect;
-
-// Extra state - in which the machine is off; but the user has switch the operating
-// switch to `on'.
+// We detect if the opertor switch is in the on position while the node/safety is off.
+// To help the user understand that they need to safe the machine first.
+//
 MachineState::machinestate_t UNSAFE;
+IODebounce *onoffSwitchDetect;
 #endif
 
 static void tellOff(const char *msg) {
@@ -115,28 +105,21 @@ static void tellOff(const char *msg) {
 
 class MachineDeck : public Deck {
 public:
-  MachineDeck(auto *node)
+  MachineDeck(BlackNodev111 *node)
     : Deck(node){};
 
   void render_pane(bool refresh) {
     _display->clearDisplay();
     _display->print_centred(MACHINE);
 
-#ifdef ONOFFSWITCH
-    _display->printf("Operator OnOff Switch\n    %s\n", onoffSwitchDetect->state() ? (interlockDetect->state() ? "unsafe(on)" : "on") : "off");
-#endif
 
-#ifdef INTERLOCK
     _display->printf("Safety/Interlock\n    %s\n",
                      interlockDetect->state() == LOW ? "armed" : "locked");
-#endif
 
-#ifdef MOTOR_CURRENT
     _display->printf("Motor Current/Voltage\n    I=%s V=%s(%s)\n",
                      motorCurrent->state() ? "yes" : "no",
                      node.getMonitoredOutput(RELAY_GPIO) ? "on" : "off",
                      node.monitoredOutputIsOK(RELAY_GPIO) ? "ok" : "FAIL");
-#endif
   }
 };
 
@@ -180,13 +163,8 @@ void setup() {
   });
 #endif
 
-#ifdef INTERLOCK
   expandedPinMode(INTERLOCK, INPUT);
   interlockDetect = new IODebounce("interlock", INTERLOCK);
-  // This I/O is an active low; so at closed interlock - the voltage is pulled down;
-  // otherwise it is floating up.
-  interlockDetect->setLabels("open/broken", "closed");
-
   node.addHandler(interlockDetect);
 
   interlockDetect->setCallback([](const int newState) {
@@ -196,7 +174,7 @@ void setup() {
     } else if (node.machinestate == FAULTED && newState == HIGH) {
       Log.println("Alert: Odd powerstate cleared.");
       node.machinestate = MachineState::WAITINGFORCARD;
-    } else if (node.machinestate == RUNNING && newState == HIGH) {
+    } else if (node.machinestate == RUNNING && newState == LOW) {
       Log.println("Alert: " MACHINE " was powered off by the relay while the motor was runing. Bad.");
       node.machinestate = MachineState::WAITINGFORCARD;
       tellOff("Always use the switch on the front to poweroff");
@@ -209,12 +187,14 @@ void setup() {
       Log.println("Normal poweron with the red button.");
       node.machinestate = POWERED;
       normal_poweron++;
+    } else if (node.machinestate == SHUTTINGDOWN && newState == LOW) {
+      Log.println("New poweron with the red button.");
+      node.machinestate = POWERED;
+      normal_poweron++;
     } else
       Debug.printf("Interlock power now %s (State: %s)\n", newState ? "OFF" : "ON", node.machinestate.label());
   });
-#endif
 
-#ifdef MOTOR_CURRENT
   motorCurrent = new IODebounce("motor_current", MOTOR_CURRENT);
   motorCurrent->setAnalogThreshold(CURR_TRESHOLD);
   node.addHandler(motorCurrent);
@@ -231,7 +211,6 @@ void setup() {
                  node.machinestate.label(), newState ? "ON" : "OFF");
     }
   });
-#endif
 
   node.setOTAPasswordHash(ota_password_hash);
   node.set_mqtt_prefix("ac");
@@ -242,17 +221,10 @@ void setup() {
   node.onReport([](JsonObject report) {
     char *p = (char *)__FILE__;
     char *q = rindex(p, '/');
-    if (q) p = q + 1;
-
+    if (q) p = q;
     char buff[128];
-    snprintf(buff, sizeof(buff), "%s", p);
-    if ((q = strstr(buff, ".ino")))
-      *q = '\0';
-
-    JsonObject fw = report["fw"].to<JsonObject>();
-    fw["file"] = buff;
-    fw["compiled"] = __DATE__ " " __TIME__;
-
+    snprintf(buff, sizeof(buff), "%s " __DATE__ " " __TIME__, p);
+    report["fw"] = buff;
     report["bad_poweroff"] = bad_poweroff;
     report["normal_poweroff"] = normal_poweroff;
     report["idle_poweron"] = idle_poweroff;
@@ -297,21 +269,6 @@ void setup() {
       node.machinestate = ACTIVATED;
   });
 
-  // Special - to allow for automated testing. Should not be done
-  // in a production node - as that violates the no distance rule.:w
-  //
-  node.webServer()->on("/swipe", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String tag = request->getParam("tag")->value();
-    Log.printf("Faking tag swipe of %c%c*******\n", tag.c_str()[0], tag.c_str()[1]);
-
-    ACBase::cmd_result_t r = node.processSwipe(tag.c_str());
-
-    char buff[128];
-    snprintf(buff, sizeof(buff), "Result=%d\n", (int)r);
-
-    request->send(HTTP_CODE_OK, "text/plain", String(buff));
-  });
-
   Log.printf("Starting loop(): %s " __DATE__ " " __TIME__ "\n", FILE2FIRMWARE(__FILE__));
 }
 
@@ -340,19 +297,36 @@ void loop() {
                           ((node.machinestate == POWERED) || (node.machinestate == RUNNING) || (node.machinestate == ACTIVATED) || (node.machinestate == SHUTTINGDOWN)) ? HIGH : LOW);
 
   static unsigned long lst = millis();
-  if (millis() - lst > 10 * 1000) {
+  if (millis() - lst > 2 * 1000 && node.machinestate >= MachineState::WAITINGFORCARD) {
     lst = millis();
+    Debug.printf("relay(0x%x): %d (%s)", RELAY_GPIO, node.getMonitoredOutput(RELAY_GPIO), node.monitoredOutputIsOK(RELAY_GPIO) ? "ok" : "FAULT");
 #ifdef ONOFFSWITCH
-    Debug.printf("Opto2/onOffSwitch(0x%x): %4u(%s(%d))",
-                 ONOFFSWITCH, onoffSwitchDetect->raw(), onoffSwitchDetect->state() ? "On " : "Off", onoffSwitchDetect->rawState());
+    Debug.printf("onOffSwitch(0x%x): %d ",
+                 ONOFFSWITCH, onoffSwitchDetect->rawState());
 #endif
 #ifdef MOTOR_CURRENT
-    Debug.printf("Curr/motorCurrent(0x%x): %4u(%s(%d))\n",
-                 MOTOR_CURRENT, motorCurrent->raw(), motorCurrent->state() ? "On " : "Off", motorCurrent->rawState());
+    Debug.printf("Curr/motorCurrent(0x%x): %d ",
+                 MOTOR_CURRENT, motorCurrent->rawState());
 #endif
 #ifdef INTERLOCK
-    Debug.printf("Opto1/Interlock(0x%x): %4u(%s(%d))\n",
-                 INTERLOCK, interlockDetect->raw(), interlockDetect->state() ? "On " : "Off", interlockDetect->rawState());
+    Debug.printf("Opto1/Interlock(0x%x): %d ",
+                 INTERLOCK, interlockDetect->rawState());
 #endif
-  };
-};
+    Debug.println();
+  }
+
+#if 0
+ {
+    static unsigned long lst = millis();
+    if (millis() - lst > 0.5 * 1000) {
+      Debug.printf("1: %01d 2: %01d 3: %01d 4: %01d C: %u\n",
+                   expandedDigitalRead(node.OPTO0),
+                   expandedDigitalRead(node.OPTO1),
+                   expandedDigitalRead(node.OPTO2),
+                   expandedDigitalRead(node.OPTO3),
+                   motorCurrent->raw());
+      lst = millis();
+    }
+  }
+#endif
+}

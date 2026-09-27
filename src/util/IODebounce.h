@@ -25,7 +25,7 @@ class IODebounce : public ACBase {
     };
     bool state();
     bool rawState();
-    unsigned short raw();
+    unsigned short raw(), rawAnalog();
 
     typedef std::function<bool(const int)> digitalReadFunction;
     void setDigitalReadFunction(digitalReadFunction func) { _digitalRead = func; };

@@ -164,7 +164,6 @@ void ACNodeBase::pop() {
 #endif
     Log.addPrintStream(syslogStream);
 #endif
-
 };
 
 IPAddress ACNodeBase::localIP() {
