@@ -25,6 +25,12 @@ static unsigned int _max = 0;
 // never more than one doc. We've not yet wrapped JsonDocument
 // in a singleton to police this.
 //
+// This last assumption does not actually hold - it is possible
+// for a web hook callback to hit exactly in the middle of
+// a timed reporting (on the other core). So at that time
+// we have a genuine need for double the allocation (or need
+// to error out of either of the two work streams). 
+
 struct SpiRamAllocator : ArduinoJson::Allocator {
 public:
 #if 1
