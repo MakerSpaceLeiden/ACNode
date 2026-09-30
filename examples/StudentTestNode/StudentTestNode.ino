@@ -340,7 +340,7 @@ void loop() {
                           ((node.machinestate == POWERED) || (node.machinestate == RUNNING) || (node.machinestate == ACTIVATED) || (node.machinestate == SHUTTINGDOWN)) ? HIGH : LOW);
 
   static unsigned long lst = millis();
-  if (millis() - lst > 10 * 1000) {
+  if (millis() - lst > 30 * 1000) {
     lst = millis();
 #ifdef ONOFFSWITCH
     Debug.printf("Opto2/onOffSwitch(0x%x): %4u(%s(%d))",

@@ -68,9 +68,9 @@ const char * checkAWStr() {
 };
 
 void BlackNodev111::report(JsonObject  & report) {
-    JsonObject m = report["i2c"].to<JsonObject>();
+    JsonObject m = report["i2c"].is<JsonObject>() ? report["i2c"] : report["i2c"].to<JsonObject>();
 
-    JsonObject n = m["AW9524"].to<JsonObject>();
+    JsonObject n = m["aw9524"].to<JsonObject>();
     n["current"] = checkAWStr();
     n["ok"] = _aw_ok;
     n["fail"] = _aw_fail;
@@ -79,8 +79,8 @@ void BlackNodev111::report(JsonObject  & report) {
 }
 
 void BlackNodev111::status(JsonObject  & report) {
-    JsonObject m = report["2ic"].to<JsonObject>();
-    m["AW9524"] = checkAWStr();
+    JsonObject m = report["i2c"].is<JsonObject>() ? report["i2c"] : report["i2c"].to<JsonObject>();
+    m["aw9524"] = checkAWStr();
     super::status(report);
 }
 

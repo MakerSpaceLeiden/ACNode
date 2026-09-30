@@ -454,10 +454,12 @@ void WhiteNodev108::report(JsonObject  & report) {
     otr["idle_poweroff"] = idle_poweroff;
     otr["headless"] = (_display == NULL) ? true : false;
 
-    JsonObject i2c = report["i2c"].to<JsonObject>();
-    i2c["mfrc522"] = _reader->alive();
+#if 1
+    //Some rough code to keep an eye on the i2c bus.
+    //
+    JsonObject i2c = report["i2c"].is<JsonObject>() ? report["i2c"] : report["i2c"].to<JsonObject>();
     JsonArray devs = i2c["devices"].to<JsonArray>();
-
+    byte c  =0;
     for (byte i = 8; i < 128; i++) {
       Wire.beginTransmission (i);
       if (Wire.endTransmission () == 0) {
@@ -466,21 +468,36 @@ void WhiteNodev108::report(JsonObject  & report) {
           case 0x24: d = "0x24 PN542 RFID chip"; break;
           case 0x28: d = "0x28 MFRC522 RFID chip"; break;
           case 0x20: d = "0x20 MCP2xx io expander"; break;
+          case 0x3C: d = "0x3C SH1107 screen"; break;
           case 0x58: d = "0x58 AW9523 io expander"; break;
           case 0x50: d = "0x50 EEProm"; break;
           default  : break;
        };
        if (d) devs.add(d); else devs.add(i);
+	c++;
      }
   }
-
+  i2c["devices_count"] = c;
+  status(report);
+#endif
     super::report(report);
 }
 
 void WhiteNodev108::status(JsonObject  & report) {
-    JsonObject m = report["i2c"].to<JsonObject>();
-    m["mfrc522"] = _reader->alive();
+    JsonObject i2c = report["i2c"].is<JsonObject>() ? report["i2c"] : report["i2c"].to<JsonObject>();
 
+    i2c["mfrc522"] = _reader->alive() ? "OK" : "fail";
+
+    // Check OLED manually
+    //
+    Wire.beginTransmission(0x3C);
+    Wire.write(0x00); // Next byte is command
+    Wire.write(0xE3); // NOP
+    Wire.endTransmission(false);       
+    Wire.requestFrom(0x3C, 1, true);
+    unsigned char status = Wire.read();
+    // i2c["oled_screen"] = (status & 0x40) ? "screensaver" : "on";
+    i2c["sh1107"] = ((status & 0x3F) == 40) ? "OK" : "fail";
     super::status(report);
 }
 
