@@ -41,6 +41,24 @@ void ExpandedGPIO::addAW9523(unsigned int i2caddr, TwoWire * wire) {
     wire->endTransmission();
 }
 
+bool ExpandedGPIO::aliveAW9523(unsigned int i2caddr, TwoWire * wire) {
+    wire->beginTransmission(i2caddr);
+    wire->write(AW9523_REG_CHIPID);
+    wire->endTransmission(false);	
+
+    wire->requestFrom(i2caddr, 1, true);
+    unsigned char idval = wire->read();
+
+    if (idval == 0x23) 
+        return true;
+
+    Log.printf("AW9523 check failed; reg(%x) = %x != 0x23\n", AW9523_REG_CHIPID, idval);
+
+    // At this point - we cannot easily reset or revert the chip; as we've
+    // not tracked the pinMode changes.
+    return true;
+}
+
 void ExpandedGPIO::xpinMode(uint8_t pin, uint8_t mode) {
     if ((pin & PIN_GPIO_MASK) == PIN_HPIO_PLAIN) {
         pinMode(pin,mode);

@@ -41,8 +41,11 @@ public:
 #ifdef  _HAS_MCP
     void addMCP(unsigned int i2c_addr = 0x20, TwoWire * wire = &Wire);
 #endif
+#ifdef _HAS_H28
+    void addH2812(unsigned int i2caddr, TwoWire * wire = &Wire);
+#endif
     void addAW9523(unsigned int i2c_addr = 0x58, TwoWire * wire = &Wire);
-    // void addH2812(unsigned int i2caddr, TwoWire * wire = &Wire);
+    bool aliveAW9523(unsigned int i2caddi = 0x58, TwoWire * wire = &Wire);
     
     void xpinMode(uint8_t pin, uint8_t mode);
 

@@ -147,6 +147,9 @@ public:
     void setMonitoredOutput(uint8_t num, bool val);
     bool getMonitoredOutput(uint8_t num);
     bool monitoredOutputIsOK(uint8_t num);
+
+    void report(JsonObject & report);
+    void status(JsonObject & report);
 protected:
     LED * errorLed = NULL;
     void pop();
@@ -187,9 +190,6 @@ private:
         return tmp;
     };
 #endif
-    
-    void report(JsonObject & report);
-    // void status(JsonObject & report);
 
 public:
     int8_t expectOut1 = -1;

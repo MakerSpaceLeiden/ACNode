@@ -432,7 +432,15 @@ void WhiteNodev108::loop() {
         Debug.println("Enabling screensaver");
         machinestate.setState(SCREENSAVER);
     };
-    
+   {
+	static unsigned long lst = 0;
+	if (millis() - lst > 5000) {
+		lst = millis();
+		if (!_reader->alive())
+			Log.println("Issue with the RFID reader. Reset.");
+	};
+    };
+ 
     super::loop();
 }
 
@@ -446,7 +454,34 @@ void WhiteNodev108::report(JsonObject  & report) {
     otr["idle_poweroff"] = idle_poweroff;
     otr["headless"] = (_display == NULL) ? true : false;
 
+    JsonObject i2c = report["i2c"].to<JsonObject>();
+    i2c["mfrc522"] = _reader->alive();
+    JsonArray devs = i2c["devices"].to<JsonArray>();
+
+    for (byte i = 8; i < 128; i++) {
+      Wire.beginTransmission (i);
+      if (Wire.endTransmission () == 0) {
+        const char * d = NULL;
+        switch(i) {
+          case 0x24: d = "0x24 PN542 RFID chip"; break;
+          case 0x28: d = "0x28 MFRC522 RFID chip"; break;
+          case 0x20: d = "0x20 MCP2xx io expander"; break;
+          case 0x58: d = "0x58 AW9523 io expander"; break;
+          case 0x50: d = "0x50 EEProm"; break;
+          default  : break;
+       };
+       if (d) devs.add(d); else devs.add(i);
+     }
+  }
+
     super::report(report);
+}
+
+void WhiteNodev108::status(JsonObject  & report) {
+    JsonObject m = report["i2c"].to<JsonObject>();
+    m["mfrc522"] = _reader->alive();
+
+    super::status(report);
 }
 
 void WhiteNodev108::setOffCallback(ButtonCallback callback,int mode) {
