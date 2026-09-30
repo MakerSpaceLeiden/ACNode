@@ -32,12 +32,17 @@ void initAW() {
     Wire.endTransmission();
 };
 
+// Hack - to drill down if it is a SW or HW issue
+// we are having; or something inside the new IDF
+// library.
+static unsigned long _aw_ok = 0, _aw_fail = 0;
 const char * checkAW() {
        Wire.beginTransmission(0x58);
 
        if (1 != Wire.write(0x10 /* AW9523_REG_CHIPID */))
 		return "write-fail";
 
+       _aw_fail++;
        switch(Wire.endTransmission(false)) {
         case 0: break;
 	case 1: return "transmit-fail - data too long"; break;
@@ -49,9 +54,35 @@ const char * checkAW() {
 
       if (Wire.requestFrom(0x58,1,false) != 1) 
 		return "read-fail - incorrect len";
-      
-     return Wire.read() == 0x23 ? NULL : "incorrect ID";
+     
+ 
+     if (Wire.read() != 0x23)
+	return "incorrect ID";
+     _aw_ok++;
+     _aw_fail--;
+     return NULL;
 };
+const char * checkAWStr() {
+	const char * r = checkAW();
+	return r ? r : "OK";
+};
+
+void BlackNodev111::report(JsonObject  & report) {
+    JsonObject m = report["i2c"].is<JsonObject>() ? report["i2c"] : report["i2c"].to<JsonObject>();
+
+    JsonObject n = m["aw9524"].to<JsonObject>();
+    n["current"] = checkAWStr();
+    n["ok"] = _aw_ok;
+    n["fail"] = _aw_fail;
+
+    super::report(report);
+}
+
+void BlackNodev111::status(JsonObject  & report) {
+    JsonObject m = report["i2c"].is<JsonObject>() ? report["i2c"] : report["i2c"].to<JsonObject>();
+    m["aw9524"] = checkAWStr();
+    super::status(report);
+}
 
 void BlackNodev111::begin(bool hasDisplay) {
     ExpandedGPIO::getInstance().addAW9523();
@@ -184,4 +215,13 @@ void BlackNodev111::loop() {
             xanalogWrite(LEDA,255);
         } else lst = 0;
     };
+{
+    static unsigned long lst = 0;
+    if (millis() - lst > 5000) {
+	lst = millis();
+        const char * result = checkAW();
+        if (result) 
+		Log.printf("AW state/selftest: %s\n", result);
+	};
+}
 }
