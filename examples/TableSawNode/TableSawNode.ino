@@ -43,6 +43,10 @@
 
 #define CURR_TRESHOLD (200)  // for full delta running; not star
 
+// Detect if the succobus is on
+//
+#define SUCCOBUS_DETECT (node.OPTO3)
+
 // The relay that sits in the safety interlock of
 // the contactor at the back-bottom of the saw.
 #define RELAY_GPIO (node.OUT0)
@@ -65,6 +69,14 @@ BlueNodev114 node = BlueNodev114(MACHINE);
 unsigned long bad_poweroff = 0, normal_poweroff = 0, normal_poweron = 0, idle_poweroff = 0;
 
 IODebounce *interlockDetect, *motorCurrent, *onoffSwitchDetect;
+
+#ifdef SUCCOBUS_DETECT
+// Extra state - after approval - check if the succobus is on - and if not
+// wait in this state until it is.
+//
+IODebounce *succobusDetect;
+MachineState::machinestate_t WAITING_FOR_SUCK;
+#endif
 
 // Extra state - when the safety contactor has actually been unlocked
 // but the RED button has not been pressed yet.
@@ -132,10 +144,14 @@ void setup() {
   Log.printf("\nBooting(): %s " __DATE__ " " __TIME__ "\n", FILE2FIRMWARE(__FILE__));
 
   // Init the hardware and get it into a safe state.
-  // Init the hardware and get it into a safe state.
   //
   expandedPinMode(RELAY_GPIO, OUTPUT);
   node.setMonitoredOutput(RELAY_GPIO, 0);
+
+#ifdef SUCCOBUS_DETECT
+  WAITING_FOR_SUCK = node.machinestate.addState("Waiting 4 Suck", LED::LED_ON,
+                                                MAX_SECS_WAIT_FOR_RED_BUTTON * 1000, MachineState::WAITINGFORCARD, false);
+#endif
 
   ACTIVATED = node.machinestate.addState("Waiting 4 Safety", LED::LED_ON,
                                          MAX_SECS_WAIT_FOR_RED_BUTTON * 1000, MachineState::WAITINGFORCARD, false);
@@ -164,6 +180,29 @@ void setup() {
       node.machinestate = MachineState::WAITINGFORCARD;
     }
   });
+#endif
+#ifdef SUCCOBUS_DETECT
+  expandedPinMode(SUCCOBUS_DETECT, INPUT);
+  succobusDetect = new IODebounce("succobus_detect", SUCCOBUS_DETECT);
+  node.addHandler(succobusDetect);
+
+  succobusDetect->setCallback([](const int newState) {
+    if (node.machinestate == MachineState::WAITINGFORCARD) {
+      node.updateDisplayStateMsg("succobus");
+      node.updateDisplayStateMsg(newState ? "OFF" : "ON", 3);
+      Debug.println(newState ? "Succobus OFF" : "Succobus ON");
+    }
+    if (node.machinestate == WAITING_FOR_SUCK && newState == LOW) {
+      Debug.println("We now have suction");
+      node.machinestate = ACTIVATED;
+    };
+    if (node.machinestate > WAITING_FOR_SUCK && newState == HIGH) {
+      // We Log rather than Debug out this - so it ends up in the
+      // daily record on the server/is MQTT visible.
+      Log.println("We LOST suction - while we are still on. Not good");
+    }
+  });
+
 #endif
 
   expandedPinMode(INTERLOCK, INPUT);
@@ -245,6 +284,8 @@ void setup() {
     };
     if (current == RUNNING)
       node.updateDisplayStateMsg("RUNNING", 2);
+    // TODO - should we show SUCK state here - perhaps as an icon in the top right corner ??
+    // or a  Suck ON/OFF text always??
   });
 
   node.onApproval([](const char *machine) {
@@ -265,7 +306,17 @@ void setup() {
 #endif
     Debug.println("Enabling machine");
     if (node.machinestate != POWERED)
-      node.machinestate = ACTIVATED;
+#ifdef SUCCOBUS_DETECT
+    {
+      if (succobusDetect->state() == HIGH) {
+        Debug.println("OK to power on - but succobus not on yet");
+        node.machinestate = WAITING_FOR_SUCK;
+      } else {
+        Log.println("OK to power on - and succobus is on; so we continue directly to activated");
+#endif
+        node.machinestate = ACTIVATED;
+      }
+    };
   });
 
   Log.printf("Starting loop(): %s " __DATE__ " " __TIME__ "\n", FILE2FIRMWARE(__FILE__));
@@ -305,6 +356,10 @@ void loop() {
     Debug.printf("Curr/motorCurrent(0x%x): %4u(%s(%d)) Opto1/Interlock(0x%x): %4u(%s(%d))\n",
                  MOTOR_CURRENT, motorCurrent->raw(), motorCurrent->state() ? "On " : "Off", motorCurrent->rawState(),
                  INTERLOCK, interlockDetect->raw(), interlockDetect->state() ? "On " : "Off", interlockDetect->rawState());
+#ifdef SUCCOBUS_DETECT
+    Debug.printf("Opto4/succoSwitch(0x%x): %4u(%s(%d))",
+                 SUCCOBUS_DETECT, succobusDetect->raw(), succobusDetect->state() ? "On " : "Off", succobusDetect->rawState());
+#endif
   }
 #if 0
  {
