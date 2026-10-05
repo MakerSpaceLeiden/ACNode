@@ -10,11 +10,11 @@ if ! grep -q "^version=$V" library.properties; then
 	exit 2
 fi
 
-if git tag -v "v$V"; then
+if git tag -v "$V"; then
 	echo "Already cut a release at that version - increase the number first."
 	exit 3
 fi
 git status || exit
 
-git tag -a v$V -m "Release tag; $V"
-git push
+git tag -a $V -m "Release tag; $V"
+git push origin $V
