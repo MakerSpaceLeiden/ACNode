@@ -82,7 +82,6 @@ void BlackNodev111::begin(bool hasDisplay) {
 	yesButton = new IODebounce("YesButton", YES_BUTTON);
         yesButton->setLabels("inactive","pressed");
 
-
         yesButton->setCallback([&](const int newState) {
             Debug.printf("YES button %s @ %s\n",newState ? "released" : "pressed", machinestate.label());
     
