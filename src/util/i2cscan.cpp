@@ -4,7 +4,7 @@
 bool i2c_address_exists(TwoWire& i2cBus, unsigned int address) {
   i2cBus.beginTransmission(address);
   return (00 == i2cBus.endTransmission());
-};
+}
 
 void scan_i2c()
 {

@@ -84,6 +84,9 @@ public:
     void begin(bool hasDisplay = true);
     void pop();
     void loop();
+
+    void report(JsonObject & report);
+    void status(JsonObject & report);
     
     // Newer nodes have an extra button.
     //

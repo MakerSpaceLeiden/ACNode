@@ -1,7 +1,8 @@
 # TLDR
 
-* Install the Arduino IDE environment (or Visual Studio Code)
-* And load the ESP32 board package (see any ESP32 tutorial)
+* Install the Arduino IDE environment (or Visual Studio Code) 
+* And load the ESP32 @ Espressiff board package (see any ESP32 tutorial)
+** Requires version 3.1.0 or newer
 * Then install the 'ACNode' software from the Library manager
 * And select any of the 'examples' for the ACNode. A good start one is the 'Student test' one.
 * Then select (depending on the hardware) the ESP32 WROOM-DA board and `Minimal SPIFFS' as the disk layout.
@@ -154,8 +155,22 @@ An example for this ``.local-config.h`` file is shown below.:
 
         #define SYSLOG_HOST    "192.168.1.2"
 
-        #define NTP_SERVER     "192.168.1.1"
-        #define NTP_POOL       NTP_SERVER ,"some.pool.ntp.org.xxxx"
+        // Your onsite NTP server, if any
+        // #define NTP_SERVER  "192.168.1.1"
+
+        // Consult https://www.ntppool.org/en/use.html for the
+        // right values.
+        #define NTP_POOL_LIST  "0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"
+
+        #ifdef NTP_SERVER
+        #ifdef NTP_POOL_LIST
+        #define NTP_POOL       NTP_SERVER, NTP_POOL_LIST
+        #else
+        #define NTP_POOL       NTP_SERVER
+        #endif
+        #else
+        #define NTP_POOL       NTP_POOL_LIST
+        #endif
 
         // Output of 'echo -n password | openssl sha256':
         #define OTA_PASSWD_HASH256  "ebd2f3fb12021751f2c86fb72c7af6551a8d290b84eba23dbbb0151ae76179be"
