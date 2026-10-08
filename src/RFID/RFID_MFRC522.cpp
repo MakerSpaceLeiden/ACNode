@@ -124,7 +124,7 @@ void RFID_MFRC522::loop() {
             cardScannedIrqSeen = false;
         };
         return;
-    };
+    }; // handle any card reads.
     
 #ifdef RFID_REPRIME_IN_IRQ_MODE
     if (_irqMode &&(millis() - _lastActivate > RFID_REPRIME_IN_IRQ_MODE)) {
@@ -139,6 +139,7 @@ void RFID_MFRC522::loop() {
         Debug.printf("Courtesy reset of RFID\n", version);
         _lastReset = millis();
         reset();
+        activateScanning();
         return;
     };
 #endif
@@ -155,6 +156,7 @@ void RFID_MFRC522::loop() {
         else {
             if (!_mfrc522->PCD_PerformSelfTest()) {
                 Log.printf("Alert - RFID reader failed the self test - resetting\n");
+                reset();
 	    	rfid_tfail++;
             } else {
                 Debug.printf("RFID reader passed selftest ok\n");

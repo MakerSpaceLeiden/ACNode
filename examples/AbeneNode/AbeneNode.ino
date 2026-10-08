@@ -62,7 +62,7 @@ const char ota_password_hash[] = OTA_PASSWD_HASH256;
 BlueNodev114 node = BlueNodev114(MACHINE);
 IODebounce *motorCurrent = NULL;
 
-const unsigned int MAX_SECS_IDLE = 30*60;
+const unsigned int MAX_SECS_IDLE = 30 * 60;
 
 // Extra state above 'POWERED' - when the saw is spinning (detected via the motorCurrent) as
 // opposed to the safety circuitry being powered (i.e. relay has closed, so the interlock
@@ -80,10 +80,17 @@ public:
     _display->clearDisplay();
     _display->print_centred(MACHINE);
 
-    _display->printf("Motor Current/Voltage\n    I=%s V=%s(%s)\n",
+    _display->printf("Motor\n    I=%s V=%s(%s)\n",
                      motorCurrent->state() ? "yes" : "no",
                      node.getMonitoredOutput(RELAY_GPIO) ? "on" : "off",
                      node.monitoredOutputIsOK(RELAY_GPIO) ? "ok" : "FAIL");
+    _display->printf("Coil: %d (%d)\n",
+                     motorCurrent->rawAnalog(), motorCurrent->state() ? "Y" : "N");
+    _display->printf("Optos: %d,%d,%d,%d\n",
+                     expandedDigitalRead(node.OPTO0),
+                     expandedDigitalRead(node.OPTO1),
+                     expandedDigitalRead(node.OPTO2),
+                     expandedDigitalRead(node.OPTO3));
   }
 };
 
@@ -181,8 +188,24 @@ void setup() {
 }
 
 void loop() {
+  bool relay = ((node.machinestate == POWERED) || (node.machinestate == RUNNING));
   node.loop();
 
-  node.setMonitoredOutput(RELAY_GPIO,
-                          ((node.machinestate == POWERED) || (node.machinestate == RUNNING)));
+  node.setMonitoredOutput(RELAY_GPIO, relay);
+
+  {
+    static unsigned long _lst = 0;
+    if (millis() - _lst > 5000) {
+      _lst = millis();
+      Log.printf("Relay: %d (%d)\n",
+                 relay, node.getMonitoredOutput(RELAY_GPIO));
+      Log.printf("Coil: %d (%d)\n",
+                 motorCurrent->rawAnalog(), motorCurrent->state() ? "Y" : "N");
+      Log.printf("Optos: %d,%d,%d,%d\n",
+                 expandedDigitalRead(node.OPTO0),
+                 expandedDigitalRead(node.OPTO1),
+                 expandedDigitalRead(node.OPTO2),
+                 expandedDigitalRead(node.OPTO3));
+    };
+  };
 }
