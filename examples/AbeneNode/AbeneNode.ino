@@ -41,10 +41,10 @@
 // the contactor at the back-bottom of the saw.
 #define RELAY_GPIO (node.OUT0)
 
-// Two of the phases of the main motor
-// are wired to this opto coupler.
+// The control voltaeg of main motor relay is
+// wired to this opto coupler.
 //
-#define MOTOR_CURRENT (node.OPTO1)
+#define MOTOR_VOLTAGE (node.OPTO0)
 
 // Generate with 'echo -n Password | openssl md5 or
 // use https://www.md5hashgenerator.com/. No \0,
@@ -60,7 +60,7 @@
 const char ota_password_hash[] = OTA_PASSWD_HASH256;
 
 BlueNodev114 node = BlueNodev114(MACHINE);
-IODebounce *motorCurrent = NULL;
+IODebounce *motorVoltage = NULL;
 
 const unsigned int MAX_SECS_IDLE = 30 * 60;
 
@@ -80,13 +80,12 @@ public:
     _display->clearDisplay();
     _display->print_centred(MACHINE);
 
-    _display->printf("Motor\n    I=%s V=%s(%s)\n",
-                     motorCurrent->state() ? "yes" : "no",
+    _display->printf("Interlock\n    S=%s(%s)\n",
                      node.getMonitoredOutput(RELAY_GPIO) ? "on" : "off",
                      node.monitoredOutputIsOK(RELAY_GPIO) ? "ok" : "FAIL");
-    _display->printf("Coil: %d (%d)\n",
-                     motorCurrent->rawAnalog(), motorCurrent->state() ? "Y" : "N");
-    _display->printf("Optos: %d,%d,%d,%d\n",
+    _display->printf("Motor voltage::\n    %s\n",
+                     motorVoltage->state() ? "off" : "running");
+    _display->printf("Optos:\n    %d,%d,%d,%d\n",
                      expandedDigitalRead(node.OPTO0),
                      expandedDigitalRead(node.OPTO1),
                      expandedDigitalRead(node.OPTO2),
@@ -110,18 +109,15 @@ void setup() {
   RUNNING = node.machinestate.addState("Running", LED::LED_ON,
                                        MachineState::NEVER, MachineState::WAITINGFORCARD, false);
 
-  motorCurrent = new IODebounce("motor_current", MOTOR_CURRENT);
-#ifdef CURR_TRESHOLD
-  motorCurrent->setAnalogThreshold(CURR_TRESHOLD);
-#endif
-  node.addHandler(motorCurrent);
+  motorVoltage = new IODebounce("motor_voltage", MOTOR_VOLTAGE);
+  node.addHandler(motorVoltage);
 
-  motorCurrent->setCallback([](const int newState) {
-    if (node.machinestate == POWERED && newState) {
-      Debug.println("Detected current. Motor switched on");
+  motorVoltage->setCallback([](const int newState) {
+    if (node.machinestate == POWERED && newState == LOW) {
+      Debug.println("Detected voltage. Motor switched on");
       node.machinestate = RUNNING;
-    } else if (node.machinestate == RUNNING && !newState) {
-      Debug.println("No more current; motor no longer on.");
+    } else if (node.machinestate == RUNNING && newState == HIGH) {
+      Debug.println("No more voltage; motor no longer on.");
       node.machinestate = POWERED;
     } else {
       Log.printf("Alert: Unexpected change in motor current; state is %s and the current is %s\n",
@@ -172,6 +168,7 @@ void setup() {
 
   // We allow 'taking over this machine while it is on' -- hence this check for
   // if it is powered; and in that case -also- accepting a new approval.
+  //
   node.onApproval([](const char *machine) {
     if ((node.machinestate == MachineState::WAITINGFORCARD) || (node.machinestate == MachineState::CHECKINGCARD))
       node.machinestate = POWERED;
@@ -188,20 +185,20 @@ void setup() {
 }
 
 void loop() {
-  bool relay = ((node.machinestate == POWERED) || (node.machinestate == RUNNING));
   node.loop();
 
+  bool relay = ((node.machinestate == POWERED) || (node.machinestate == RUNNING));
   node.setMonitoredOutput(RELAY_GPIO, relay);
 
   {
     static unsigned long _lst = 0;
     if (millis() - _lst > 5000) {
       _lst = millis();
-      Log.printf("Relay: %d (%d)\n",
-                 relay, node.getMonitoredOutput(RELAY_GPIO));
-      Log.printf("Coil: %d (%d)\n",
-                 motorCurrent->rawAnalog(), motorCurrent->state() ? "Y" : "N");
-      Log.printf("Optos: %d,%d,%d,%d\n",
+      Debug.printf("Interlock: %s (%s)\n",
+                 relay ? "on" : "off", node.getMonitoredOutput(RELAY_GPIO) ? "on" : "off");
+      Debug.printf("Motor voltage: %s\n",
+                 motorVoltage->state() ? "none" : "present");
+      Debug.printf("Optos: %d,%d,%d,%d\n",
                  expandedDigitalRead(node.OPTO0),
                  expandedDigitalRead(node.OPTO1),
                  expandedDigitalRead(node.OPTO2),
@@ -209,3 +206,4 @@ void loop() {
     };
   };
 }
+
