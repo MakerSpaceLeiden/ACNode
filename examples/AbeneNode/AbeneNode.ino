@@ -41,10 +41,15 @@
 // the contactor at the back-bottom of the saw.
 #define RELAY_GPIO (node.OUT0)
 
-// The control voltaeg of main motor relay is
+// The voltage on the main motor relay
 // wired to this opto coupler.
 //
 #define MOTOR_VOLTAGE (node.OPTO0)
+
+// General mains is visible on opto 1; i.e. when
+// the switch on the side is set to 'on'.
+//
+#define MAINS_VOLTAGE (node.OPTO1)
 
 // Generate with 'echo -n Password | openssl md5 or
 // use https://www.md5hashgenerator.com/. No \0,
@@ -60,7 +65,9 @@
 const char ota_password_hash[] = OTA_PASSWD_HASH256;
 
 BlueNodev114 node = BlueNodev114(MACHINE);
+
 IODebounce *motorVoltage = NULL;
+IODebounce *mainsVoltage = NULL;
 
 const unsigned int MAX_SECS_IDLE = 30 * 60;
 
@@ -71,6 +78,10 @@ const unsigned int MAX_SECS_IDLE = 30 * 60;
 //
 MachineState::machinestate_t RUNNING;
 
+// safety is ok - but machine switch not yet set to on.
+//
+MachineState::machinestate_t UNLOCKED;
+
 class MachineDeck : public Deck {
 public:
   MachineDeck(BlackNodev111 *node)
@@ -80,12 +91,14 @@ public:
     _display->clearDisplay();
     _display->print_centred(MACHINE);
 
-    _display->printf("Interlock\n    S=%s(%s)\n",
+    _display->printf("Intrlck %s/%s\n",
                      node.getMonitoredOutput(RELAY_GPIO) ? "on" : "off",
-                     node.monitoredOutputIsOK(RELAY_GPIO) ? "ok" : "FAIL");
-    _display->printf("Motor voltage::\n    %s\n",
-                     motorVoltage->state() ? "off" : "running");
-    _display->printf("Optos:\n    %d,%d,%d,%d\n",
+                     node.monitoredOutputIsOK(RELAY_GPIO) ? "ok" : "err");
+    _display->printf("Mains   %s\n",
+                     mainsVoltage->state() ? "off" : "pwrd");
+    _display->printf("Motor   %s\n",
+                     motorVoltage->state() ? "off" : "run");
+    _display->printf("Optos   %d%d%d%d\n",
                      expandedDigitalRead(node.OPTO0),
                      expandedDigitalRead(node.OPTO1),
                      expandedDigitalRead(node.OPTO2),
@@ -106,12 +119,29 @@ void setup() {
   //
   node.machinestate.setTimeout(POWERED, MAX_SECS_IDLE * 1000);
 
+  UNLOCKED = node.machinestate.addState("Unlocked", LED::LED_ON,
+                                       10*1000, MachineState::WAITINGFORCARD, false);
+
   RUNNING = node.machinestate.addState("Running", LED::LED_ON,
                                        MachineState::NEVER, MachineState::WAITINGFORCARD, false);
 
+  mainsVoltage = new IODebounce("mains_voltage", MOTOR_VOLTAGE);
+  node.addHandler(mainsVoltage);
+  mainsVoltage->setCallback([](const int newState) {
+    if (node.machinestate == UNLOCKED && newState == LOW) {
+      Debug.println("Detected voltage on mains, powered");
+      node.machinestate = POWERED;
+    } else if (node.machinestate > UNLOCKED && newState == HIGH) {
+      Debug.println("No more voltage; mains turned off. Locking machine");
+      node.machinestate = MachineState::WAITINGFORCARD;
+    } else {
+      Log.printf("Alert: Unexpected change in mains voltage; state is %s and the current is %s\n",
+                 node.machinestate.label(), newState ? "ON" : "OFF");
+    }
+  });
+
   motorVoltage = new IODebounce("motor_voltage", MOTOR_VOLTAGE);
   node.addHandler(motorVoltage);
-
   motorVoltage->setCallback([](const int newState) {
     if (node.machinestate == POWERED && newState == LOW) {
       Debug.println("Detected voltage. Motor switched on");
@@ -120,7 +150,7 @@ void setup() {
       Debug.println("No more voltage; motor no longer on.");
       node.machinestate = POWERED;
     } else {
-      Log.printf("Alert: Unexpected change in motor current; state is %s and the current is %s\n",
+      Log.printf("Alert: Unexpected change in motor voltage; state is %s and the current is %s\n",
                  node.machinestate.label(), newState ? "ON" : "OFF");
     }
   });
@@ -140,30 +170,23 @@ void setup() {
   node.begin();
 
   node.setOnChangeCallback(MachineState::ALL_STATES, [](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
+    if (current == UNLOCKED) {
+      node.updateDisplayStateMsg(node.lastApproved()->displayName(), 1);
+      node.updateDisplayStateMsg("Not yet ON", 2);
+    };
     if (current == POWERED) {
-      node.updateDisplay("OFF", "", true);  // only show off when you can actually do off.
       node.updateDisplayStateMsg(node.lastApproved()->displayName(), 1);
       node.updateDisplayStateMsg("ON - not running", 2);
     };
     if (current == RUNNING) {
-      node.updateDisplayStateMsg(node.lastApproved()->displayName(), 1);
       node.updateDisplayStateMsg("RUNNING", 2);
     };
   });
 
   node.setMenuCallback([](const int newState) -> bool {
-    if (node.machinestate >= POWERED)
+    if (node.machinestate >= UNLOCKED)
       return true;  // prevent menu interaction while running
     return false;
-  });
-
-  node.setOffCallback([](const int newState) -> bool {
-    if (node.machinestate != POWERED)
-      return false;
-    node.buzzerErr();
-    node.machinestate = MachineState::WAITINGFORCARD;
-    Log.println("Powered off after user button press");
-    return true;
   });
 
   // We allow 'taking over this machine while it is on' -- hence this check for
@@ -171,7 +194,7 @@ void setup() {
   //
   node.onApproval([](const char *machine) {
     if ((node.machinestate == MachineState::WAITINGFORCARD) || (node.machinestate == MachineState::CHECKINGCARD))
-      node.machinestate = POWERED;
+      node.machinestate = mainsVoltage->state() ? UNLOCKED : POWERED;
     else if (node.machinestate == POWERED || node.machinestate == RUNNING)
       Debug.printf("Machine handed over to user %s", node.lastApproved()->name);
     else {
@@ -187,7 +210,7 @@ void setup() {
 void loop() {
   node.loop();
 
-  bool relay = ((node.machinestate == POWERED) || (node.machinestate == RUNNING));
+  bool relay = (node.machinestate == POWERED) || (node.machinestate == RUNNING) || (node.machinestate == UNLOCKED);
   node.setMonitoredOutput(RELAY_GPIO, relay);
 
   {
@@ -196,6 +219,8 @@ void loop() {
       _lst = millis();
       Debug.printf("Interlock: %s (%s)\n",
                  relay ? "on" : "off", node.getMonitoredOutput(RELAY_GPIO) ? "on" : "off");
+      Debug.printf("Mains voltage: %s\n",
+                mainsVoltage->state() ? "none" : "present");
       Debug.printf("Motor voltage: %s\n",
                  motorVoltage->state() ? "none" : "present");
       Debug.printf("Optos: %d,%d,%d,%d\n",
