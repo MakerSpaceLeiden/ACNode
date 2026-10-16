@@ -24,6 +24,14 @@
 */
 #include <WhiteNodev108.h>
 
+#ifndef ARDUINO_PARTITION_min_spiffs
+#error "Unexpected partition table; may break OTA"
+#endif
+#ifndef ARDUINO_ESP32_WROOM_DA
+#error "Black/Blue Hardware is expected to be an ESP32 WROOM-DA"
+#endif
+
+
 #ifndef MACHINE
 #define MACHINE   "woodlathe"
 #endif
@@ -33,18 +41,19 @@
 
 //#define OTA_PASSWD_MD5  "0f475732f6c1a632b3e161160be0cfc5" // the MD5 of "SomethingSecrit"
 
-#ifndef OTA_PASSWD_HASH
-#error "An OTA password MUST be set as a MD5. Sorry."
+#ifndef OTA_PASSWD_HASH256
+#error "An OTA password MUST be set as a SHA256. Sorry."
 // Generate with 'echo -n Password | openssl md5 or
 // use https://www.md5hashgenerator.com/. No \0,
 // cariage return or linefeed  at the end of the
 // password; just the characters of the password
 // itself.
 #endif
+const char ota_password_hash[] = OTA_PASSWD_HASH256;
 
 WhiteNodev108 node = WhiteNodev108(MACHINE);
 
-ButtonDebounce * motorCurrent;
+IODebounce * motorCurrent;
 MachineState::machinestate_t RUNNING;
 
 unsigned long bad_poweroff = 0, normal_poweroff = 0;
@@ -63,7 +72,7 @@ void setup() {
   //
   RUNNING = node.machinestate.addState("Saw Running", LED::LED_ON, MachineState::NEVER, 0);
 
-  motorCurrent = new ButtonDebounce(MOTOR_CURRENT);
+  motorCurrent = new IODebounce("MOTOR_CURRENT", MOTOR_CURRENT);
   motorCurrent->setAnalogThreshold(600);  // typical is 0-50 for off, 1200 for on.
   motorCurrent->setCallback([](const int newState) {
     if (node.machinestate == POWERED && newState) {
@@ -76,9 +85,9 @@ void setup() {
       Log.printf("Unexpected change in motor current; state is %s and the current is %s\n",
                  node.machinestate.label(), newState ? "ON" : "OFF");
     }
-  }, CHANGE);
+  });
 
-  node.setOTAPasswordHash(OTA_PASSWD_HASH);
+  node.setOTAPasswordHash(ota_password_hash);
   node.set_mqtt_prefix("ac");
   node.set_master("master");
 
