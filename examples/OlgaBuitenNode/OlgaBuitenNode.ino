@@ -20,9 +20,9 @@
   Compile settings:
   - ESP32-WROOM-DA Module (or ESP32 Dev) with minial SPIFFs
   Wiring:
-  - https://wiki.makerspaceleiden.nl/mediawiki/index.php/Node_Olga_Binnen
+  - https://wiki.makerspaceleiden.nl/mediawiki/index.php/Node_Olga_Buiten
   QR code:
-  - https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_olgabinnen
+  - https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_olgabuiten
 
 Lock states
 

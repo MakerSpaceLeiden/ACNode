@@ -125,7 +125,7 @@ void setup() {
   RUNNING = node.machinestate.addState("Running", LED::LED_ON,
                                        MachineState::NEVER, MachineState::WAITINGFORCARD, false);
 
-  mainsVoltage = new IODebounce("mains_voltage", MOTOR_VOLTAGE);
+  mainsVoltage = new IODebounce("mains_voltage", MAINS_VOLTAGE);
   node.addHandler(mainsVoltage);
   mainsVoltage->setCallback([](const int newState) {
     if (node.machinestate == UNLOCKED && newState == LOW) {
