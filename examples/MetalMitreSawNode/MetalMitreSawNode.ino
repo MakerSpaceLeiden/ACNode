@@ -22,8 +22,9 @@
 #ifndef ARDUINO_PARTITION_min_spiffs
 #error "Unexpected partition table; may break OTA"
 #endif
+
 #ifndef ARDUINO_ESP32_WROOM_DA
-#error "Black/Blue Hardware is expected to be an ESP32 WROOM-DA"
+#warning "White/Black/Blue Hardware is expected to be an ESP32 WROOM-DA"
 #endif
 
 #include <WhiteNodev108.h>
@@ -49,7 +50,6 @@ const unsigned long COOLANT_NAG_TIMEOUT = 60;  // Start nagging after running fo
 // and is wired into the same 3P+N+E power as the saw itself.
 //
 WhiteNodev108 node = WhiteNodev108(MACHINE, WIFI_NETWORK, WIFI_PASSWD);
-
 
 #define SAFETY (node.OPTO1)
 #define PUMP (node.OPTO0)

@@ -1,6 +1,8 @@
 #include "REST/ACRestNode.h"
 #include "REST/rest.h"
 
+#include <HTTPClient.h> // for 200 Ok, etc
+
 #include "util/jsonAllocator.h"
 
 #include <ESPAsyncWebServer.h>
@@ -63,7 +65,6 @@ void ACNodeRest::pop() {
     machinestate.addOnChangeCallback(MachineState::WAITINGFORCARD, [&](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
         clearLastApproved();
     });
-    
 
     _restAPI->setTerminalname(machine);
     _restAPI->onPairingRequested([this](){
@@ -108,8 +109,19 @@ void ACNodeRest::pop() {
         }
     });
     webServer()->addHandler(_ws);
-
-}
+   
+    digestAuthHash.setUsername(SPIFF_PASSWD_USER);
+    digestAuthHash.setPasswordHash(SPIFF_PASSWD_MD5);  // MD5(user:realm:pass) sans any \n, \0, etc
+    digestAuthHash.setRealm(SPIFF_PASSWD_REALM);
+    digestAuthHash.setAuthFailureMessage("SPIFF Authentication failed");
+    digestAuthHash.setAuthType(AsyncAuthType::AUTH_DIGEST);
+ 
+    webServer()->on("/resetDB",  HTTP_GET, [this](AsyncWebServerRequest *request) {
+        Debug.println("Reset DB requested");
+	bool wiped = _approvalAPI->resetDB();
+        request->send(wiped ? HTTP_CODE_OK : HTTP_CODE_INTERNAL_SERVER_ERROR, "text/plain", wiped ? "OK" : "Operation failed");
+    }).addMiddleware(&digestAuthHash);
+};
 
 void ACNodeRest::begin(eth_board_t board, uint8_t clear_button) {
     super::begin(board,clear_button);

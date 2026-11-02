@@ -61,7 +61,7 @@
 // #define OTA_PASSWD_MD5  "0f475732f6c1a632b3e161160be0cfc5" // the MD5 of "SomethingSecrit"
 
 #ifndef OTA_PASSWD_HASH256
-#error "An OTA password MUST be set as an MD5. Sorry."
+#error "An OTA password MUST be set as an SHA256. Sorry."
 #endif
 
 #define RELAY_NO_START (node.OUT0)  // output -- NO is the 'START' signal for the safety contactor
@@ -91,9 +91,9 @@
 //
 #define SAFETY_RELAY_BUTTON_PRESS_LENGTH (750 /* mSeconds */)
 
-// This node is currently not wired; instead it uses an AC/DC convertor
-// and is wired into the same 3P+N+E power as the oven itself. We need
-// to change this to get the 12 volt we need for reliable kWh measuring.
+// This node is currently wired;  We need
+// to change this to get the 12 volt we need
+// for reliable kWh measuring.
 //
 WhiteNodev108 node = WhiteNodev108(MACHINE);
 
@@ -148,6 +148,7 @@ void setup() {
       }
     }
   });
+  node.addHandler(vk2000detect);
 
   pinMode(SAFETY, INPUT);
   safetyDetect = new IODebounce("Interlock", SAFETY);
@@ -169,6 +170,7 @@ void setup() {
       node.machinestate = POWERED;
     }
   });
+  node.addHandler(safetyDetect);
 
   pinMode(WHPULS_GPIO, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(WHPULS_GPIO), irqWattHourPulse, FALLING);
@@ -178,6 +180,7 @@ void setup() {
   ovenCurrent->setCallback([](const int newState) {
     Log.printf("Current to heating coil now %s\n", newState ? "OFF" : "ON");
   });
+  node.addHandler(ovenCurrent);
 
   node.setOffCallback([](const int newState) -> bool {
     // the ceramics node is special in that we do not allow
@@ -247,6 +250,10 @@ void setup() {
     digitalWrite(RELAY_NO_START, HIGH);
     delay(SAFETY_RELAY_BUTTON_PRESS_LENGTH);
     digitalWrite(RELAY_NO_START, LOW);
+
+    node.updateDisplayStateMsg("Waiting for", 1);
+    node.updateDisplayStateMsg("Mains Power", 2);
+    node.updateDisplayStateMsg("to come on", 3);
   });
 
   Log.println("Starting loop(): " __FILE__ " " __DATE__ " " __TIME__);
@@ -261,5 +268,15 @@ void loop() {
     Log.printf("kWh meter: %.3f\n", whCounter / 1000.);
     lst = millis();
     cnt = whCounter;
+  }
+  {
+    static unsigned long _lst = 0;
+    if (millis() - _lst > 5000) {
+      _lst = millis();
+      Debug.printf("Optos=%d,%d Current=%d\n",
+                   expandedDigitalRead(node.OPTO0),
+                   expandedDigitalRead(node.OPTO1),
+                   ovenCurrent->rawAnalog());
+    }
   }
 }

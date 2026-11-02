@@ -10,6 +10,7 @@
 
 #include "Display/Deck.h"
 #include "OTA.h"
+#include "util/part.h"
 
 #include "DisplayPage.h"
 
@@ -168,11 +169,17 @@ void WhiteNodev108::begin(bool hasDisplay) {
 	request->send(ok ? HTTP_CODE_OK: HTTP_CODE_INTERNAL_SERVER_ERROR,
 		 "text/plain", ok ? "OK\n" : "RFID check error\n");
     });
+
     webServer()->on("/rfidState",  HTTP_GET, [this](AsyncWebServerRequest *request) {
 	Log.println("RFID state/selftest requested");
 	request->send(HTTP_CODE_OK, "text/plain", _reader->stateString());
     });
 
+    webServer()->on("/partitions", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    	AsyncResponseStream *response = request->beginResponseStream("plain/text", 40 * 1024);
+        partition_info(*response);
+        request->send(response);
+    });
 
     OTAWithDisplay * ota = new OTAWithDisplay(_ota_hash, _display, moi);
     ota->setOTAOK([&](){

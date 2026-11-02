@@ -362,7 +362,7 @@ rest_ret_t registerDeviceSwipe(const char * terminalName, const char * tag) {
     };
     peer = client.getPeerCertificate();
     if (!peer) {
-        Log.printf("Server did not set a peer cert (%s, Status: %s)\n",buff,  https.errorToString(httpCode));
+        Log.printf("Server did not set a peer cert (%s, Status: %s)\n",buff,  https.errorToString(httpCode).c_str());
         ret = ERR_REPAIR;
         goto exit;
     };
@@ -677,7 +677,7 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
       	    int sizeAvailable = stream->available();
             if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
-			Log.printf("HTTP buff read timeout (received %lu, %lu to go for total of %u)\n", 
+			Log.printf("HTTP buff read timeout (received %u, %u to go for total of %u)\n", 
 				l, len - l, len);
 			break;
 		};

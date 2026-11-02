@@ -26,6 +26,20 @@ static void prepareCache(bool wipe) {
     Log.println("Filesystem ready.");
 };
 
+bool ApprovalAPI::resetDB() {
+    SPIFFS.end();
+    SPIFFS.format();
+
+    if (SPIFFS.begin()) {
+	scheduleForcedReload();
+	Debug.println("SPIFFS formatting and remount completed, scheduling update");
+	return true;
+    };
+
+    Debug.println("SPIFFS remount failed");
+    return false;
+}
+
 bool ApprovalAPI::import(const char * filename) {
     File f = SPIFFS.open(filename,"r");
     return f ? ApprovalBINFile::import(&f) : false;
