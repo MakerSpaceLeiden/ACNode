@@ -11,6 +11,7 @@ static void partloop(Print &out, const char * label, esp_partition_type_t part_t
       const esp_partition_t * running = esp_ota_get_running_partition();
       const esp_partition_t * boot = esp_ota_get_boot_partition();
       const esp_partition_t * nxt = esp_ota_get_next_update_partition(NULL);
+      const esp_partition_t * faulted = esp_ota_get_last_invalid_partition();
       const esp_partition_t *next_partition = NULL;
       esp_partition_iterator_t iterator = NULL;
 
@@ -19,11 +20,12 @@ static void partloop(Print &out, const char * label, esp_partition_type_t part_t
       while (iterator) {
          next_partition = esp_partition_get(iterator);
          if (next_partition != NULL) {
-            out.printf("%5s %2x addr: 0x%06lx; size: 0x%06lx; label: %s%s%s%s\n", 
+            out.printf("%5s %2x addr: 0x%06lx; size: 0x%06lx; label: %s%s%s%s%s\n", 
 		label, part_type, next_partition->address, next_partition->size, next_partition->label,
 		(next_partition == running) ? " RUNNING" : "",
 		(next_partition == boot) ? " BOOT" : "",
-		(next_partition == nxt) ? " NEXT" : ""
+		(next_partition == nxt) ? " NEXT" : "",
+	        (next_partition == faulted) ? "FAULTED" : ""
 	    );
          iterator = esp_partition_next(iterator);
         }

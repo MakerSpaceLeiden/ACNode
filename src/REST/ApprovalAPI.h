@@ -30,6 +30,7 @@ public:
     ApprovalAPI(RestAPI * r, const char * machine) : _restAPI(r), machine(machine) {};
     
     bool canApprove();
+    bool resetDB();
     
     void begin();
     void loop();
