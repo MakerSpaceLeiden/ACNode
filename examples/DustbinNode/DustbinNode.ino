@@ -19,9 +19,7 @@
 
   QR code shown:
 
-   https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_studenttest
-
-   2025/02/10 - changes freom a 1.08 white not to a newer blue board
+   https://wiki.makerspaceleiden.nl/mediawiki/index.php/QR_dustbin
 */
 #include <BlueNodev114.h>
 #include <HTTPClient.h>
@@ -59,7 +57,8 @@ const char ota_password_hash[] = OTA_PASSWD_HASH256;
 auto node = BlueNodev114(MACHINE,WIFI_NETWORK,WIFI_PASSWD);
 bool bin_full = false;
 bool succubus_on = false;
-// BINFULL measurement logic: if in two consecutive 5-measurement windows at least one of the
+/
+/ BINFULL measurement logic: if in two consecutive 5-measurement windows at least one of the
 // measurements shows low=bin_full - then the bin is full
 bool previous_window = false;               // remembers result of prev. window measurement
 bool succubus_known = false;
@@ -70,8 +69,8 @@ bool reboot_pending = false;
 unsigned long last_bin_check = 0;
 unsigned long reset_message_start = 0;
 
-const unsigned long BIN_CHECK_INTERVAL = 10000; // duration between BINFULL  measurement windows
-const unsigned long RESET_MESSAGE_TIME = 5000;  // duration to show "emptied" message on display 
+const unsigned long BIN_CHECK_INTERVAL = 10*1000; // duration between BINFULL  measurement windows, in mSeconds
+const unsigned long RESET_MESSAGE_TIME = 5*1000;  // duration to show "emptied" message on display, in mSeconds
 
 #ifdef SUCCON             // IODebounce is a helper class which cleans up hardware inputs.
 IODebounce *succonCurrent;// using a *pointer here so that if this macro is not defined /
@@ -80,7 +79,6 @@ IODebounce *succonCurrent;// using a *pointer here so that if this macro is not 
 
 MachineState::machinestate_t BINFULL_STATE;   // Define machine state when IR sensor drops to 0 and relay opens
 MachineState::machinestate_t RUNNING;// Normal operational state
-
 
 class MachineDeck : public Deck {
 public:
