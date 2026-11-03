@@ -16,6 +16,7 @@ static void partloop(Print &out, const char * label, esp_partition_type_t part_t
       esp_partition_iterator_t iterator = NULL;
 
       iterator = esp_partition_find(part_type, ESP_PARTITION_SUBTYPE_ANY, NULL);
+      size_t total = 0;
 
       while (iterator) {
          next_partition = esp_partition_get(iterator);
@@ -27,10 +28,12 @@ static void partloop(Print &out, const char * label, esp_partition_type_t part_t
 		(next_partition == nxt) ? " NEXT" : "",
 	        (next_partition == faulted) ? "FAULTED" : ""
 	    );
+         total += next_partition->size,;
          iterator = esp_partition_next(iterator);
         }
       }
       esp_partition_iterator_release(iterator);
+      out.printf("Total: %lx (%.1f MByte)\n", total, 0.05 + total/1024./1024.);
 }
 
 void partition_info(Print &out) {

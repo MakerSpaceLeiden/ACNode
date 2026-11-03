@@ -11,12 +11,39 @@
 #include <mbedtls/sha256.h>
 #include <mbedtls/aes.h>
 
+extern "C" {
+#include "esp_spiffs.h"
+}
+
+static void ls(Print &out, String dirname) {
+  File root = SPIFFS.open(dirname);
+  if (!root) {
+    out.println("Failed to open directory: "+dirname);
+    return;
+  }
+  if (!root.isDirectory()) {
+    out.println(dirname + " is not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      out.printf("-        %s\n", file.path());
+      ls(out, file.path());
+    } else {
+      out.printf("%7d %s\n", file.size(), file.path());
+    }
+    file = root.openNextFile();
+  }
+}
+
 static void prepareCache(bool wipe) {
     Log.println(wipe ? "Resetting Filesystem" : "Mounting Filesystem");
     if (wipe)
-        SPIFFS.format();
+        SPIFFS.format() ? Log.println("Formatting failed") : Debug.println("Formatted ok");
     
-    if (!SPIFFS.begin()) {
+    if (!SPIFFS.begin(true /* format on fail */)) {
         Log.println("Mount failed - trying to reformat");
         if (!SPIFFS.format() || !SPIFFS.begin()) {
             Log.println("SPIFFS mount after re-formatting also failed. Giving up. No caching.");
@@ -24,15 +51,28 @@ static void prepareCache(bool wipe) {
         };
     };
     Log.println("Filesystem ready.");
+    ls(Debug, "/");
 };
 
 bool ApprovalAPI::resetDB() {
     SPIFFS.end();
-    SPIFFS.format();
 
-    if (SPIFFS.begin()) {
-	scheduleForcedReload();
+    if (!SPIFFS.format())
+	Log.println("SPIFFS.format failed.");
+
+    esp_log_level_set("*", ESP_LOG_VERBOSE);
+    bool wdt_active = disableCore0WDT();
+    esp_err_t err = esp_spiffs_format(NULL);
+    if (wdt_active) enableCore0WDT();
+    esp_log_level_set("*", (esp_log_level_t)CONFIG_LOG_DEFAULT_LEVEL);
+
+    if (err) 
+      Debug,printf("Formatting SPIFFS failed! Error: %d\n", err);
+
+    if (SPIFFS.begin(true)) {
 	Debug.println("SPIFFS formatting and remount completed, scheduling update");
+	ls(Debug, "/");
+	scheduleForcedReload();
 	return true;
     };
 
@@ -46,7 +86,7 @@ bool ApprovalAPI::import(const char * filename) {
 }
 
 void ApprovalAPI::begin() {
-    prepareCache(false);
+    prepareCache(true);
     _valid = import(TAGBINFILE);
 };
 
@@ -153,9 +193,12 @@ void ApprovalAPI::updateTagDB() {
         return;
     };
 
-    SPIFFS.remove(TAGBINFILE_OLD);
-    SPIFFS.rename(TAGBINFILE,TAGBINFILE_OLD);
-    SPIFFS.rename(TAGBINFILE_NEW,TAGBINFILE);
+    if (!SPIFFS.remove(TAGBINFILE_OLD))
+	Debug.printf("Could not remove %s\n", TAGBINFILE_OLD);
+    if (!SPIFFS.rename(TAGBINFILE,TAGBINFILE_OLD))
+	Debug.printf("Could not rename %s to %s\b", TAGBINFILE,TAGBINFILE_OLD);
+    if (! SPIFFS.rename(TAGBINFILE_NEW,TAGBINFILE))
+	Debug.printf("Could not rename %s to %s\b", TAGBINFILE_NEW,TAGBINFILE);
 
     Log.println("Updated tag db");
     _valid = true;
@@ -224,7 +267,7 @@ void ApprovalDeck::render_pane(bool refresh) {
         return;
     
     _display->print_centred("TAG DB");
-    if (!_approvalAPI) {
+    if (!_approvalAPI || !_approvalAPI->getIdentifier()) {
         _display->printf("not ready");
         return;
     };

@@ -28,9 +28,10 @@
 #include "REST/jwt.h"
 #include "util/common-utils.h"
 
-#ifndef HTTP_TIMEOUT
-#define HTTP_TIMEOUT (5000)
-#endif
+//#ifndef HTTP_TIMEOUT
+#undef HTTP_TIMEOUT
+#define HTTP_TIMEOUT (15000)
+//#endif
 
 // mbedtls_x509_crt * client_cert_ptr = NULL, client_cert;
 
@@ -223,7 +224,8 @@ rest_ret_t registerDevice(const char * terminalName) {
     };
     
     snprintf((char *) buff, sizeof(buff),  TERMINAL_URL REGISTER_PATH "?name=%s", encarg);
-    
+    Debug.printf("registerDevice(%s)\n", (char *) buff);
+
     if (!https.begin(client, (const char*)buff)) {
         Log.println("Failed to begin https");
         goto exit;
@@ -348,7 +350,7 @@ rest_ret_t registerDeviceSwipe(const char * terminalName, const char * tag) {
     client.setPrivateKey(client_key_as_pem);
 
     if (!https.begin(client, (char *)buff )) {
-        Log.println("Failed to begin https");
+        Log.println("registerDeviceSwipe: Failed to begin https");
         goto exit;
     };
     https.setTimeout(HTTP_TIMEOUT);
@@ -356,25 +358,25 @@ rest_ret_t registerDeviceSwipe(const char * terminalName, const char * tag) {
 
     httpCode = https.GET();
     if (httpCode <= 0) {
-	Log.printf("Get failed, error %s (%s)\n", https.errorToString(httpCode).c_str(), buff);
+	Log.printf("registerDeviceSwipe: failed, error %s (%s)\n", https.errorToString(httpCode).c_str(), buff);
         ret = ERR_REPAIR;
         goto exit;
     };
     peer = client.getPeerCertificate();
     if (!peer) {
-        Log.printf("Server did not set a peer cert (%s, Status: %s)\n",buff,  https.errorToString(httpCode).c_str());
+        Log.printf("registerDeviceSwipe: Server did not set a peer cert (%s, Status: %s)\n",buff,  https.errorToString(httpCode).c_str());
         ret = ERR_REPAIR;
         goto exit;
     };
     if (NULL == peer->raw.p || 0 == peer->raw.len) {
-        Log.println("Server did not provide peer cert data.");
+        Log.println("registerDeviceSwipe: Server did not provide peer cert data.");
         ret = ERR_REPAIR;
         goto exit;
     };
     mbedtls_sha256(peer->raw.p, peer->raw.len, tmp, 0);
 
     if (memcmp(tmp, sha256_server, 32)) {
-        Log.println("Server changed mid registration. Aborting");
+        Log.println("registerDeviceSwipe: Server changed mid registration. Aborting");
         ret = ERR_REPAIR;
         goto exit;
     }
@@ -553,7 +555,7 @@ rest_ret_t raw_rest_setup(const char * terminalName, const char *url,  String en
         ret = ERR_RETRYABLE;
         goto exit;
     };
-    return NOERROR;
+    ret = NOERROR;
 exit:
     https.end();
     client.stop();
