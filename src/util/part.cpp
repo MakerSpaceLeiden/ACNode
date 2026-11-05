@@ -7,13 +7,14 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 
-static void partloop(Print &out, const char * label, esp_partition_type_t part_type) {
+static size_t partloop(Print &out, const char * label, esp_partition_type_t part_type) {
       const esp_partition_t * running = esp_ota_get_running_partition();
       const esp_partition_t * boot = esp_ota_get_boot_partition();
       const esp_partition_t * nxt = esp_ota_get_next_update_partition(NULL);
       const esp_partition_t * faulted = esp_ota_get_last_invalid_partition();
       const esp_partition_t *next_partition = NULL;
       esp_partition_iterator_t iterator = NULL;
+      size_t total = 0;
 
       iterator = esp_partition_find(part_type, ESP_PARTITION_SUBTYPE_ANY, NULL);
 
@@ -27,16 +28,21 @@ static void partloop(Print &out, const char * label, esp_partition_type_t part_t
 		(next_partition == nxt) ? " NEXT" : "",
 	        (next_partition == faulted) ? "FAULTED" : ""
 	    );
+	 total += next_partition->size;
          iterator = esp_partition_next(iterator);
         }
       }
       esp_partition_iterator_release(iterator);
+
+      return total;
 }
 
 void partition_info(Print &out) {
         out.println("Partition list:");
-        partloop(out, "APP ",ESP_PARTITION_TYPE_APP);
-        partloop(out, "DATA",ESP_PARTITION_TYPE_DATA);
+        size_t total = 0;
+        total += partloop(out, "APP ",ESP_PARTITION_TYPE_APP);
+        total += partloop(out, "DATA",ESP_PARTITION_TYPE_DATA);
+        out.printf("Total: 0x%x/%u (%.1f MByte)\n", total, total,0.05 + total/1024./1024.);
 }
    
 String currentPartition() {
