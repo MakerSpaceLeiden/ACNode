@@ -31,7 +31,7 @@
 #endif
 
 #ifndef ARDUINO_PARTITION_min_spiffs
-#error "Unexpected partition table; may break OTA"
+#warning "Unexpected partition table; may break OTA"
 #endif
 
 #ifndef MACHINE
@@ -307,24 +307,29 @@ void loop() {
     idle_poweroff++;
   };
 
-  node.setMonitoredOutput(RELAY_GPIO,
-                          ((node.machinestate == POWERED) || (node.machinestate == RUNNING) ||
-#ifdef AKWARD_BUTTON_POSITION
-                           (node.machinestate == SHUTTINGDOWN)
-#endif
-                             (node.machinestate == ACTIVATED))
-                            ? HIGH
-                            : LOW);
+  bool relay_state = (node.machinestate == POWERED) || (node.machinestate == RUNNING) || (node.machinestate == ACTIVATED);
+ #ifdef AKWARD_BUTTON_POSITION
+  relay_state |= (node.machinestate == SHUTTINGDOWN);
+ #endif
 
-  static unsigned long lst = millis();
-  if (millis() - lst > 10 * 1000) {
-    lst = millis();
-#ifdef ONOFFSWITCH
-    Debug.printf("Opto2/onOffSwitch(0x%x): %4u(%s(%d))",
-                 ONOFFSWITCH, onoffSwitchDetect->raw(), onoffSwitchDetect->state() ? "On " : "Off", onoffSwitchDetect->rawState());
+  node.setMonitoredOutput(RELAY_GPIO, relay_state ? HIGH : LOW);
+ 
+   static unsigned long lst = millis();
+   if (millis() - lst > 10 * 1000) {
+     lst = millis();
+     Debug.printf("Relay: %s", relay_state ? "engaged" : "off");
+#ifdef MOTOR_CURRENT
+     Debug.printf(" Curr/motorCurrent(0x%x): %4u(%s(%d))",
+                 MOTOR_CURRENT, motorCurrent->raw(), motorCurrent->state() ? "On " : "Off", motorCurrent->rawState());
 #endif
-    Debug.printf("Curr/motorCurrent(0x%x): %4u(%s(%d)) Opto1/Interlock(0x%x): %4u(%s(%d))\n",
-                 MOTOR_CURRENT, motorCurrent->raw(), motorCurrent->state() ? "On " : "Off", motorCurrent->rawState(),
+#ifdef INTERLOCK
+    Debug.printf(" Opto1/Interlock(0x%x): %4u(%s(%d))",
                  INTERLOCK, interlockDetect->raw(), interlockDetect->state() ? "On " : "Off", interlockDetect->rawState());
-  }
+#endif
+ #ifdef ONOFFSWITCH
+    Debug.printf(" Opto2/onOffSwitch(0x%x): %4u(%s(%d))",
+                  ONOFFSWITCH, onoffSwitchDetect->raw(), onoffSwitchDetect->state() ? "On " : "Off", onoffSwitchDetect->rawState());
+#endif
+    Debug.println();
+   }
 }

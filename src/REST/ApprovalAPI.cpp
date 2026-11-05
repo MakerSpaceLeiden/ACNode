@@ -28,7 +28,8 @@ static void prepareCache(bool wipe) {
 
 bool ApprovalAPI::resetDB() {
     SPIFFS.end();
-    SPIFFS.format();
+    if (!SPIFFS.format())
+       Log.println("SPIFFS: Reformatting failed.");
 
     if (SPIFFS.begin()) {
 	scheduleForcedReload();
@@ -102,13 +103,15 @@ void ApprovalAPI::loop() {
 ApprovalAPI::update_t ApprovalAPI::needsUpdate() {
     unsigned char * buff = NULL;
     char url[] = ACL_URL PATH_GETCOUNTER;
-    size_t len = 1024;
+    size_t len = 256;
     update_t ret = FAIL;
     unsigned long cntr;
 
     int n = _restAPI->get(url,&len,&buff);
-    if (n < 2)
+    if (n < 2) {
+        Log.printf("Not enough data returned for a DB counter (%d bytes)\n", n);
 	goto exit;
+    };
 
     buff[n-1] = 0; // damages last byte (CR/LF or comments) - which is ok as we own this buffer
     cntr = atoi((char *)buff);
@@ -224,6 +227,8 @@ void ApprovalDeck::render_pane(bool refresh) {
         return;
     
     _display->print_centred("TAG DB");
+    _display->printCmdBar("UPDATE","NEXT");
+
     if (!_approvalAPI) {
         _display->printf("not ready");
         return;
@@ -245,5 +250,4 @@ void ApprovalDeck::render_pane(bool refresh) {
     _display->printf("Check:%s %s\n", (_approvalAPI->getLastUpdate()) ?
                      since((millis() - _approvalAPI->getLastUpdate())/1000).c_str() : "never",
 		    (_approvalAPI->getLastUpdate()) ? "ago" : "");
-    _display->printCmdBar("UPDATE","NEXT");
 };

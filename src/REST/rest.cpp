@@ -526,6 +526,7 @@ rest_ret_t raw_rest_setup(const char * terminalName, const char *url,  String en
     
     if (httpCode == HTTP_CODE_FOUND) {
         // Special case; to confirm pairing; with no data sent (should change into some json with config).
+        Debug.printf("raw_rest: code found; pairing confirmed\n");
         ret = NOERROR_OK;
         goto exit;
     }
@@ -555,21 +556,35 @@ rest_ret_t raw_rest_setup(const char * terminalName, const char *url,  String en
     };
     return NOERROR;
 exit:
-    https.end();
-    client.stop();
     return ret;
 }
 
 rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpostargs, THContentCallback cb) {
+    int n, sizeAvailable;
+    unsigned char buff[2048];
+    size_t left, len;
+    unsigned long _lst, TO = 10 * 1000, l = 0;
+    WiFiClient * stream;
+
     rest_ret_t ret = ERR_FATAL;
 
-    if ((ret = raw_rest_setup(terminalName, url, encodedpostargs)) != NOERROR)
-	return ret;
+    if ((ret = raw_rest_setup(terminalName, url, encodedpostargs)) != NOERROR) {
+        if (ret != NOERROR_OK)
+               Debug.println("REST setup failed, abort");
+         ret = ERR_FATAL;
+         goto exit;
+    };
 
-    WiFiClient * stream = https.getStreamPtr();
-    size_t len = https.getSize();
+   stream = https.getStreamPtr();
 
-    unsigned long _lst = millis(), TO = 10*100, l = 0;
+   if (stream == NULL) {
+          Log.println("HTTP Stream not available");
+          ret = ERR_FATAL;
+          goto exit;
+    };
+    len = https.getSize();
+
+    _lst = millis();
     for(;l<len && len != -1;) {
 	    if (!stream->connected()) {
                 if (len != -1) {
@@ -579,7 +594,7 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
                 break; 
             };
 
-      	    int sizeAvailable = stream->available();
+      	    sizeAvailable = stream->available();
             if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
 			Log.printf("HTTP raw read timeout (received %lu, %lu to go for total of %u)\n", 
@@ -591,16 +606,13 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
 		continue;
 	    };
 
-            _lst = millis();
-            TO = 3 * 1000;
-
-	    unsigned char buff[2048];
-            size_t left = sizeof(buff);
+            _lst = millis(); TO = 3*1000;
+            left = sizeof(buff);
 
             if (left > sizeAvailable)
                   left = sizeAvailable;
 
-            int n = stream->readBytes(buff, left);
+            n = stream->readBytes(buff, left);
             if (n <= 0) {
 		if (len == -1)
 			break;
@@ -620,7 +632,7 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
             };
 	    l += n;
    };
-
+exit:
    https.end();
    client.stop();
 
@@ -629,16 +641,21 @@ rest_ret_t raw_rest(const char * terminalName, const char *url, String encodedpo
 
 size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp, unsigned char ** buffp, rest_ret_t * ret, String encodedpostargs) {
     unsigned char * buff = NULL;
-    size_t max, l = 0;
-    int len = 0;
+    size_t max, l = 0, n, left;
+    int len = 0, sizeAvailable;
+    unsigned long _lst, TO = 10*1000;
+    WiFiClient * stream;
 
-    if ((*ret = raw_rest_setup(terminalName, url, encodedpostargs)) != NOERROR)
-	return 0;
+    if ((*ret = raw_rest_setup(terminalName, url, encodedpostargs)) != NOERROR) {
+        if (*ret != NOERROR_OK)
+               Debug.println("REST setup failed, abort");
+        goto exit;
+    };
  
     len = https.getSize();
     if (len) {
         if (len == -1)
-            max = 12 * 1024 * 1024; // Hard cap when the length is unknown (we should propably realloc() for this).
+            max = 12 * 1024; // Hard cap when the length is unknown (we should propably realloc() for this).
         
         if (len != -1 && len < max)
             max = len;
@@ -664,17 +681,22 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
             goto exit;
         }
 
-        WiFiClient * stream = https.getStreamPtr();
+        stream = https.getStreamPtr();
+        if (stream == NULL) {
+               Log.println("HTTP Stream not available");
+                *ret = ERR_FATAL;
+               goto exit;
+        };
         l = 0;
-        unsigned long _lst = millis(), TO = 10*1000;
-        for(unsigned char * p = buff; l < len && len != -1;) {
+         _lst = millis();
+        for(unsigned char * p = buff; l < len || len == -1;) {
 	    if (!stream->connected()) {
                 if (len != -1)
                    Log.println("Connection closed unexpectedly");
                 break; 
             };
 
-      	    int sizeAvailable = stream->available();
+      	    sizeAvailable = stream->available();
             if (sizeAvailable == 0 && len != -1) {
 		if ((unsigned long)(millis() - _lst) > TO) {
 			Log.printf("HTTP buff read timeout (received %u, %u to go for total of %u)\n", 
@@ -684,14 +706,14 @@ size_t raw_rest(const char * terminalName, const char *url, size_t * maxbufflenp
 		yield(); 
 		continue;
 	    };
-            size_t left = (buffp == NULL) ? max : max - l; 
+            left = (buffp == NULL) ? max : max - l; 
             _lst = millis();
             TO = 1500;
 
             if (left > sizeAvailable)
                   left = sizeAvailable;
 
-            int n = stream->readBytes(p, left);
+            n = stream->readBytes(p, left);
             if (n <= 0) {
 		if (len == -1)
 			break;
