@@ -224,10 +224,7 @@ void setup() {
   node.setNodeDeck(new MachineDeck(&node));
 
   node.onReport([](JsonObject report) {
-    char *p = __FILE__;
-    char *q = rindex(p, '/');
-    if (q) p = q;
-    report["fw"] = __FILE__ " " __DATE__ " " __TIME__;
+    report["fw"] = fwstring(__FILE__,__DATE__,__TIME__);
     report["bad_poweroff"] = bad_poweroff;
     report["normal_poweroff"] = normal_poweroff;
     report["idle_poweron"] = idle_poweroff;
