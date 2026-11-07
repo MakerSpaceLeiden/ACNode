@@ -227,27 +227,28 @@ void ApprovalDeck::render_pane(bool refresh) {
         return;
     
     _display->print_centred("TAG DB");
-    _display->printCmdBar("UPDATE","NEXT");
 
-    if (!_approvalAPI) {
-        _display->printf("not ready");
-        return;
+    if (_approvalAPI) {
+        _display->printf("ID   :%08lx %s\n",
+                         _approvalAPI->getIdentifier(),
+                         _approvalAPI->versionStr());
+        
+        time_t datadate = _approvalAPI->getDataDate();
+        struct tm * t = gmtime((const time_t *)&datadate);
+        char ds[12], ts[12];
+        time_t age = time(NULL) - _approvalAPI->getDataDate();
+        strftime(ds,sizeof(ds),"%Y-%m-%d",t);
+        strftime(ts,sizeof(ts),"%H:%M:%S",t);
+
+        _display->printf("Dated:%s\n",ds);
+        _display->printf("      %sZ\n",ts);
+        _display->printf("Age  :%s\n",since(age).c_str());
+
+        _display->printf("Check:%s %s\n", (_approvalAPI->getLastUpdate()) ?
+                         since((millis() - _approvalAPI->getLastUpdate())/1000).c_str() : "never",
+    		    (_approvalAPI->getLastUpdate()) ? "ago" : "");
+       } else {
+        _display->printf("None");
     };
-    _display->printf("ID   :%08lx %s\n",
-                     _approvalAPI->getIdentifier(),
-                     _approvalAPI->versionStr());
-    
-    time_t datadate = _approvalAPI->getDataDate();
-    struct tm * t = gmtime((const time_t *)&datadate);
-    char ds[12], ts[12];
-    time_t age = time(NULL) - _approvalAPI->getDataDate();
-
-    strftime(ds,sizeof(ds),"%Y-%m-%d",t);
-    strftime(ts,sizeof(ts),"%H:%M:%S",t);
-    _display->printf("Dated:%s\n",ds);
-    _display->printf("      %sZ\n",ts);
-    _display->printf("Age  :%s\n",since(age).c_str());
-    _display->printf("Check:%s %s\n", (_approvalAPI->getLastUpdate()) ?
-                     since((millis() - _approvalAPI->getLastUpdate())/1000).c_str() : "never",
-		    (_approvalAPI->getLastUpdate()) ? "ago" : "");
+    _display->printCmdBar("UPDATE","NEXT"); // implies a ->display() update of the printfs().
 };

@@ -27,13 +27,14 @@ public:
     } state_t;
     virtual const char *name() { return "RestAPI"; };
     const char * getStatLabel() {
-        const char *label[] ={ "NTP", "CA", "REG", "SWIPE", "CHK", "FLL", "DNE", "RET", "RBO" };
+        // Strings kept short/simple as they also need to work on the 7 segment displays.
+        const char *label[] ={ "BOOT", "NTP", "CA", "REG", "SWIPE", "CHK", "FLL", "DNE", "RET", "RBO" };
         if (md < 0 || md > WIFI_FAIL_REBOOT) return "???";
         return label[md];
     };
     void begin();
     void loop();
-    bool ready() { return FULLY_REGISTERED == md; };
+    bool ready() { return FULLY_REGISTERED == md || md == DONE; };
     
     ACBase::cmd_result_t handleTagSwipe(const char * tag);
     
