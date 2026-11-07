@@ -126,6 +126,7 @@ public:
     ~ACNodeBase() { Serial.println("DESTROY ACNodeBase should enver happen"); };
 
     virtual const char * name() { return "ACNodeBase"; }
+    virtual const char * uploadConnector() { return "USB-A"; }
     
     void set_report_period(const unsigned long period) { _report_period = period; };
     void set_mqtt_host(const char *p);
@@ -146,7 +147,6 @@ public:
     String getHostname();
     String macAddressString();
     String chipId();
-    
     void delayedReboot();
    
     AsyncWebServer * webServer() { return _webServer; };

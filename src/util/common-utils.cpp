@@ -83,3 +83,13 @@ char *_argencode(char *dst, size_t n, const char *src)
     return dst;
 }
 
+
+String fwstring(const char * file, const char * date, const char * time) {
+        char buff[128], * p;
+        if ((p = strstr(file, "Arduino"))) file = p;
+        if ((p = strstr(file, "libraries"))) file = p;
+        if ((p = strstr(file, "ACNode"))) file = p;
+        snprintf(buff,sizeof(buff),"%s %s %s", file, date, time);
+        return String(buff);
+};
+

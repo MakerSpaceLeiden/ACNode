@@ -413,6 +413,7 @@ void ACNodeBase::report(JsonObject & out) {
     fw[ "sdk" ] = _sdk;
     fw[ "rom_size_bits" ] = get_rom_size() * 8;
     fw[ "compiled" ] = __DATE__ " " __TIME__;
+    fw[ "connector" ] =  uploadConnector();
     
     if (_start_beat == 0)
         if (time(NULL) > 1542275849)
