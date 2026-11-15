@@ -1,5 +1,5 @@
 /*
-      Copyright 2015-2018 Dirk-Willem van Gulik <dirkx@webweaving.org>
+      Copyright 2015-2026 Dirk-Willem van Gulik <dirkx@webweaving.org>
                           Stichting Makerspace Leiden, the Netherlands.
 
    Licensed under the Apache License, Version 2.0 (the "License");

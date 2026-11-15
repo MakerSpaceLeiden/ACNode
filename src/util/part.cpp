@@ -28,7 +28,7 @@ static size_t partloop(Print &out, const char * label, esp_partition_type_t part
 		(next_partition == nxt) ? " NEXT" : "",
 	        (next_partition == faulted) ? "FAULTED" : ""
 	    );
-	 total += next_partition->size;
+         total += next_partition->size;
          iterator = esp_partition_next(iterator);
         }
       }

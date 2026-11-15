@@ -140,15 +140,15 @@ bool isDaytime() {
   }
   // Serial.println(&ts, "C %A, %B %d %Y %H:%M:%S zone %Z %z ");
 
-  if (ts.tm_hour < 8 || ts.tm_hour > 18 || (ts.tm_hour > 17 && ts.tm_min > 30))
+  if (ts.tm_hour < 7 || ts.tm_hour > 18)
     return false;  // outside 9 am to 17:30 local time
 
   // saturday
-  if (ts.tm_wday == 6 && (ts.tm_hour < 10 || ts.tm_hour > 15))
+  if (ts.tm_wday == 6 && (ts.tm_hour < 10 || ts.tm_hour > 17))
     return false;  // Saturday - before 10 or after 15:00
 
   /* sunday */
-  if (ts.tm_wday == 0 && (ts.tm_hour < 12 || ts.tm_hour > 15))
+  if (ts.tm_wday == 0 && (ts.tm_hour < 12 || ts.tm_hour > 16))
     return false;  // Sunday - before 12 or after 15:00
 
   return true;
@@ -195,7 +195,7 @@ void setup() {
   // pulse the latch into day modus during this time
   BUZZING = node.machinestate.addState((const char *)"Buzzing",
                                        LED::LED_IDLE,
-                                       (time_t)(BUZZ_TIME * 1000),  // stay in this state for BUZZ_TIME seconds
+                                       (time_t)(BUZZ_TIME * 2500),  // stay in this state for BUZZ_TIME seconds
                                        BRACKET,                     // then go to idle for a bit.
                                        false /* no OTA during this */,
                                        false /* No reporting until we're done with the door. */
@@ -362,7 +362,8 @@ void setup() {
 void loop() {
   bool in_open = node.machinestate.state() == BUZZING || node.machinestate.state() == BRACKET;
   bool motorlock_out = doorstate != NIGHT_LOCK || node.machinestate.state() == BUZZING;
-  bool solenoid_out = in_open || doorstate == UNLOCKED;
+  bool solenoid_out = (BRACKET == node.machinestate.state()) || doorstate == UNLOCKED;
+  bool buzzing_out = (BRACKET == node.machinestate.state());
 
   bool green_led = !solenoid_out;
   bool red_led = (doorstate != NIGHT_LOCK);
@@ -401,7 +402,7 @@ void loop() {
 
   node.setMonitoredOutput(DAY_OPEN, motorlock_out);
   node.setMonitoredOutput(DAY_SOLENOID, solenoid_out);
-  node.buzzer(in_open);
+  node.buzzer(buzzing_out);
 
   // Pressing the red button will `force' the door closed, even during
   // working hours until either the end of the working day or until the
