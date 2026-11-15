@@ -86,7 +86,7 @@ bool ApprovalAPI::import(const char * filename) {
 }
 
 void ApprovalAPI::begin() {
-    prepareCache(true);
+    prepareCache(false);
     _valid = import(TAGBINFILE);
 };
 
@@ -142,13 +142,15 @@ void ApprovalAPI::loop() {
 ApprovalAPI::update_t ApprovalAPI::needsUpdate() {
     unsigned char * buff = NULL;
     char url[] = ACL_URL PATH_GETCOUNTER;
-    size_t len = 1024;
+    size_t len = 256;
     update_t ret = FAIL;
     unsigned long cntr;
 
     int n = _restAPI->get(url,&len,&buff);
-    if (n < 2)
+    if (n < 2) {
+        Log.printf("Not enough data returned for a DB counter (%d bytes)\n", n);
 	goto exit;
+    };
 
     buff[n-1] = 0; // damages last byte (CR/LF or comments) - which is ok as we own this buffer
     cntr = atoi((char *)buff);
@@ -267,26 +269,27 @@ void ApprovalDeck::render_pane(bool refresh) {
         return;
     
     _display->print_centred("TAG DB");
-    if (!_approvalAPI || !_approvalAPI->getIdentifier()) {
-        _display->printf("not ready");
-        return;
-    };
-    _display->printf("ID   :%08lx %s\n",
-                     _approvalAPI->getIdentifier(),
-                     _approvalAPI->versionStr());
-    
-    time_t datadate = _approvalAPI->getDataDate();
-    struct tm * t = gmtime((const time_t *)&datadate);
-    char ds[12], ts[12];
-    time_t age = time(NULL) - _approvalAPI->getDataDate();
+    if (_approvalAPI) {
+        _display->printf("ID   :%08lx %s\n",
+                         _approvalAPI->getIdentifier(),
+                         _approvalAPI->versionStr());
+        
+        time_t datadate = _approvalAPI->getDataDate();
+        struct tm * t = gmtime((const time_t *)&datadate);
+        char ds[12], ts[12];
+        time_t age = time(NULL) - _approvalAPI->getDataDate();
+        strftime(ds,sizeof(ds),"%Y-%m-%d",t);
+        strftime(ts,sizeof(ts),"%H:%M:%S",t);
 
-    strftime(ds,sizeof(ds),"%Y-%m-%d",t);
-    strftime(ts,sizeof(ts),"%H:%M:%S",t);
-    _display->printf("Dated:%s\n",ds);
-    _display->printf("      %sZ\n",ts);
-    _display->printf("Age  :%s\n",since(age).c_str());
-    _display->printf("Check:%s %s\n", (_approvalAPI->getLastUpdate()) ?
-                     since((millis() - _approvalAPI->getLastUpdate())/1000).c_str() : "never",
-		    (_approvalAPI->getLastUpdate()) ? "ago" : "");
-    _display->printCmdBar("UPDATE","NEXT");
+        _display->printf("Dated:%s\n",ds);
+        _display->printf("      %sZ\n",ts);
+        _display->printf("Age  :%s\n",since(age).c_str());
+
+        _display->printf("Check:%s %s\n", (_approvalAPI->getLastUpdate()) ?
+                         since((millis() - _approvalAPI->getLastUpdate())/1000).c_str() : "never",
+    		    (_approvalAPI->getLastUpdate()) ? "ago" : "");
+       } else {
+        _display->printf("None");
+    };
+    _display->printCmdBar("UPDATE","NEXT"); // implies a ->display() update of the printfs().
 };

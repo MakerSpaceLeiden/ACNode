@@ -23,6 +23,7 @@ public:
     unsigned long autoReportCycle;
     bool safeForOTA; // Can we safely allow a resetting Over the Air update (OTA) ?
     bool backgroundTaskOk; // can we do bookkeeping safely
+    bool reportStateChange = true; // is this a mere display action - or a real state change.
         
     // Bookkeeping
     time_t timeInState;
@@ -136,7 +137,12 @@ public:
     machinestate_t addState(const char * label, machinestate_t nextstate = WAITINGFORCARD);
     machinestate_t addState(const char * label, time_t timeout, machinestate_t nextstate = WAITINGFORCARD);
     machinestate_t addState(const char * label, LED::led_state_t ledState, time_t timeout, machinestate_t nextstate = WAITINGFORCARD, bool isSafeForOTA = true, bool backgroundTaskOk = false);
-    
+   
+    bool reportStateChanges();
+    void setStateChangesReporting(machinestate_t s, bool onOff) {
+	_state2stateStruct[s]->reportStateChange = onOff;
+    };
+
     void setTimeoutState(machinestate_t s, machinestate_t next) {
         _state2stateStruct[s]->failStateOnTimeout = next;
     };

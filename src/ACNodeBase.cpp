@@ -297,8 +297,7 @@ void ACNodeBase::_begin(eth_board_t board /* default is BOARD_AART */, uint8_t c
 #endif
     
     if (_wired) {
-        Log.println("Wired mode");
-        // WiFi.mode(WIFI_STA);
+       Log.printf("Wired Mode. ETH MAC: %s\n", ETH.macAddress().c_str());
     } else
         if (_ssid) {
             Log.printf("Starting up wifi (hardcoded SSID <%s>)\n", _ssid);
@@ -414,6 +413,7 @@ void ACNodeBase::report(JsonObject & out) {
     fw[ "sdk" ] = _sdk;
     fw[ "rom_size_bits" ] = get_rom_size() * 8;
     fw[ "compiled" ] = __DATE__ " " __TIME__;
+    fw[ "connector" ] =  uploadConnector();
     
     if (_start_beat == 0)
         if (time(NULL) > 1542275849)

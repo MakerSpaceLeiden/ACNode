@@ -87,6 +87,8 @@ void WhiteNodev108::pop() {
 	MachineState::WAITINGFORCARD, true, true);
 
     INFODISPLAY = machinestate.addState("User browsing info pages", LED::LED_OFF, 20 * 1000, MachineState::WAITINGFORCARD);
+    machinestate.setStateChangesReporting(INFODISPLAY, false);
+
     POWERED =     machinestate.addState("Powered but idle", LED::LED_ON, MAX_IDLE_TIME * 1000, MachineState::WAITINGFORCARD);
 
     _deskCtrl = new DeckController();

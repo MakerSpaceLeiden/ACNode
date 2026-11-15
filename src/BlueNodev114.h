@@ -10,6 +10,7 @@ public:
     BlueNodev114(const char * machine = NULL, bool wired = true, acnode_proto_t proto = PROTO_SIG2) : BlackNodev111(machine, wired, proto) {};
 
     virtual const char * name() { return "BlueNodev114"; }
+    virtual const char * uploadConnector() { return "USB-C"; }
     
     void CONSTS() {
         BUTT2 = 0; 

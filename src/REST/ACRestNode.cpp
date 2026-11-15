@@ -247,7 +247,10 @@ void ACNodeRest::loop() {
 
     if (_stateChanged && machinestate.isStable()) {
 		_stateChanged = false;
-		reportStateChange();
+		if (machinestate.reportStateChanges()) 
+			reportStateChange();
+		else
+			Debug.println("Not reporting state change");
     };
 
     // Gate the stuff that (also) does HTTP/rest -as that can be slow

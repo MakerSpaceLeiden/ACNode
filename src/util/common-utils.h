@@ -52,6 +52,7 @@ bool i2c_address_exists(TwoWire& i2cBus, unsigned int address);
 extern double coreTemp();
 #endif
 
+
 #define safesnprintf(buff,len, format, ...) { snprintf(buff,len,format, __VA_ARGS__); buff[len-1]='\0'; }
 
 #define safestrcpy(dst,src) { strncpy(dst,src,sizeof(dst)); dst[sizeof(dst)-1]='\0'; }
@@ -59,4 +60,8 @@ extern double coreTemp();
 
 char *_argencode(char *dst, size_t n, const char *src);
 String encodeargs(std::vector<String> pairs, bool skipEmpty);
+
+// Sanitize the build string into something that makes sense; i.e. strip
+// local home-dir/tmp names.
+String fwstring(const char * file, const char * date, const char * time);
 #endif
