@@ -13,6 +13,9 @@
 
 SET_LOOP_TASK_STACK_SIZE(16*1024);
 
+#define __(x) #x
+#define _(x) __(x)
+
 #ifdef ESP32
 #include <WiFi.h>
 #include <ETH.h>
@@ -30,6 +33,12 @@ SET_LOOP_TASK_STACK_SIZE(16*1024);
 #include "WhiteNodeIndexPage.h"
 
 #include "util/jsonAllocator.h"
+
+#ifdef TAG
+	const char *BUILD_TAG = TAG;
+#else
+    	const char *BUILD_TAG = "untagged-build";
+#endif
 
 beat_t beatCounter = 0;      // My own timestamp - manually kept due to SPI timing issues.
 
@@ -413,9 +422,7 @@ void ACNodeBase::report(JsonObject & out) {
     fw[ "sdk" ] = _sdk;
     fw[ "rom_size_bits" ] = get_rom_size() * 8;
     fw[ "compiled" ] = __DATE__ " " __TIME__;
-#ifdef TAG
-    fw[ "tag" ] = TAG;
-#endif
+    fw[ "tag" ] = BUILD_TAG;
     fw[ "connector" ] =  uploadConnector();
     
     if (_start_beat == 0)

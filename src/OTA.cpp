@@ -207,4 +207,5 @@ void OTADeck::render_pane(bool refresh) {
     _display->printf("Host: %s\n",ArduinoOTA.getHostname().c_str());
     _display->printf("Port: %d\n",OTA_PORT);
     _display->printf("Slce: %s\n",currentPartition().c_str());
+    _display->printf("Tag : %s\n",BUILD_TAG);
 };

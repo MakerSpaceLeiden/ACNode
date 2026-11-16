@@ -302,6 +302,7 @@ protected:
 };
 
 String since(unsigned long up);
+extern const char *BUILD_TAG;
 
 // Unfortunately - MQTT callbacks cannot yet pass
 // a pointer. So we need a 'global' variable; and
