@@ -14,7 +14,12 @@ do
 	(
 		set -e
 		cd $node
-
+		NAME=$(grep '^#define' $node.ino | grep MACHINE | sed -e 's/.*MACHINE *"//' -e 's/".*//')
+		if [ x$NAME = x ]; then
+			echo No node name found. abort $NAME
+			exit 1
+		fi
+		
 		# Make the builds somewhat reproducable; by using the 
 		# commit date of the last commit.
  		#
@@ -38,8 +43,11 @@ do
 			. # >"$BUILDDIR/compile-$node.log" 2&>1 
 		cd "$OUTDIR"
 		rm -f *.bootloader.bin *.map *.merged.bin *.partitions.bin
+		mv $node.bin.ino $name.bin
+		mv $node.elf $name.elf
+		sha256 $name.bin
 	) || exit $?
 done
-# rm -rf  "$BUILDDIR" 
+rm -rf  "$BUILDDIR" 
 exit 0
 #			--build-property "$all_flags -DTAG=\"$TAG\"" \

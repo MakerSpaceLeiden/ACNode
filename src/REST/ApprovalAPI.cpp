@@ -67,7 +67,7 @@ bool ApprovalAPI::resetDB() {
     esp_log_level_set("*", (esp_log_level_t)CONFIG_LOG_DEFAULT_LEVEL);
 
     if (err) 
-      Debug,printf("Formatting SPIFFS failed! Error: %d\n", err);
+      Debug.printf("Formatting SPIFFS failed! Error: %d\n", err);
 
     if (SPIFFS.begin(true)) {
 	Debug.println("SPIFFS formatting and remount completed, scheduling update");

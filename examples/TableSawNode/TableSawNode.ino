@@ -37,7 +37,7 @@
 #define MACHINE "tablesaw"  // tafelcircelzaag
 #endif
 
-#define INTERLOCK (node.OPTO0)  // Detect voltage on the interlock/safety contactor.
+// #define INTERLOCK (node.OPTO0)  // Detect voltage on the interlock/safety contactor.
 //#define ONOFFSWITCH (node.OPTO1)    // Detects voltage on the normally-closed circuit of the front switch.
 #define MOTOR_CURRENT (node.CURR0)  // One of the 3-phase wires to the motor runs through this current coil.
 
@@ -46,6 +46,7 @@
 // Detect if the succobus is on
 //
 #define SUCCOBUS_DETECT (node.OPTO3)
+#define MAX_SECS_WAIT_FOR_SUCK (30)
 
 // The relay that sits in the safety interlock of
 // the contactor at the back-bottom of the saw.
@@ -78,11 +79,13 @@ IODebounce *succobusDetect;
 MachineState::machinestate_t WAITING_FOR_SUCK;
 #endif
 
+#ifdef INTERLOCK
 // Extra state - when the safety contactor has actually been unlocked
 // but the RED button has not been pressed yet.
 //
 MachineState::machinestate_t ACTIVATED;
 const unsigned int MAX_SECS_WAIT_FOR_RED_BUTTON = 100;
+#endif
 
 // Extra state above 'POWERED' - when the saw is spinning (detected via the motorCurrent) as
 // opposed to the safety circuitry being powered (i.e. relay has closed, so the interlock
@@ -128,8 +131,10 @@ public:
     _display->printf("Operator OnOff Switch\n    %s\n", onoffSwitchDetect->state() ? (interlockDetect->state() ? "unsafe(on)" : "on") : "off");
 #endif
 
+#ifdef INTERLOCK
     _display->printf("Safety/Interlock\n    %s\n",
                      interlockDetect->state() == LOW ? "armed" : "locked");
+#endif
 
     _display->printf("Motor Current/Voltage\n    I=%s V=%s(%s)\n",
                      motorCurrent->state() ? "yes" : "no",
@@ -150,16 +155,18 @@ void setup() {
 
 #ifdef SUCCOBUS_DETECT
   WAITING_FOR_SUCK = node.machinestate.addState("Waiting 4 Suck", LED::LED_ON,
-                                                MAX_SECS_WAIT_FOR_RED_BUTTON * 1000, MachineState::WAITINGFORCARD, false);
+                                                MAX_SECS_WAIT_FOR_SUCK * 1000, MachineState::WAITINGFORCARD, false);
 #endif
 
+#ifdef INTERLOCK
   ACTIVATED = node.machinestate.addState("Waiting 4 Safety", LED::LED_ON,
                                          MAX_SECS_WAIT_FOR_RED_BUTTON * 1000, MachineState::WAITINGFORCARD, false);
+#endif
+
   RUNNING = node.machinestate.addState("Saw Running", LED::LED_ON,
                                        MachineState::NEVER, MachineState::WAITINGFORCARD, false);
   SHUTTINGDOWN = node.machinestate.addState("Locking machine",
                                             LED::LED_ON, 10 * 1000, MachineState::WAITINGFORCARD, false);
-
 
 #ifdef ONOFFSWITCH
   expandedPinMode(ONOFFSWITCH, INPUT);
@@ -194,7 +201,11 @@ void setup() {
     }
     if (node.machinestate == WAITING_FOR_SUCK && newState == LOW) {
       Debug.println("We now have suction");
+#ifdef INTERLOCK
       node.machinestate = ACTIVATED;
+#else
+      node.machinestate = POWERED;
+#endif
     };
     if (node.machinestate > WAITING_FOR_SUCK && newState == HIGH) {
       // We Log rather than Debug out this - so it ends up in the
@@ -204,7 +215,7 @@ void setup() {
   });
 
 #endif
-
+#ifdef INTERLOCK
   expandedPinMode(INTERLOCK, INPUT);
   interlockDetect = new IODebounce("interlock", INTERLOCK);
   node.addHandler(interlockDetect);
@@ -232,6 +243,7 @@ void setup() {
     } else
       Debug.printf("Interlock power now %s (State: %s)\n", newState ? "OFF" : "ON", node.machinestate.label());
   });
+#endif
 
   motorCurrent = new IODebounce("motor_current", MOTOR_CURRENT);
   motorCurrent->setAnalogThreshold(CURR_TRESHOLD);
@@ -273,15 +285,19 @@ void setup() {
 
   node.setOnChangeCallback(MachineState::ALL_STATES, [](MachineState::machinestate_t last, MachineState::machinestate_t current) -> void {
     if (current == RUNNING || current == POWERED) {
+#ifdef INTERLOCK
       // We do not show the 'OFF' button - we expect the user to use
       // the RED/Green on/off button of the safety contactor.
+#endif
       node.updateDisplay("", "", true);
     };
+#ifdef INTERLOCK
     if (current == POWERED) {
       node.updateDisplayStateMsg("POWERED", 1);
       node.updateDisplayStateMsg("press RED", 2);
       node.updateDisplayStateMsg("to turn off", 3);
     };
+#endif
     if (current == RUNNING)
       node.updateDisplayStateMsg("RUNNING", 2);
     // TODO - should we show SUCK state here - perhaps as an icon in the top right corner ??
@@ -314,18 +330,25 @@ void setup() {
       } else {
         Log.println("OK to power on - and succobus is on; so we continue directly to activated");
 #endif
+#ifdef INTERLOCK
         node.machinestate = ACTIVATED;
-      }
-    };
+#else
+      node.machinestate = POWERED;
+#endif
+      };
+    }
   });
-
   Log.printf("Starting loop(): %s " __DATE__ " " __TIME__ "\n", FILE2FIRMWARE(__FILE__));
 }
 
 void loop() {
   node.loop();
 
-  if (node.machinestate == ACTIVATED || node.machinestate == SHUTTINGDOWN) {
+  if (
+#ifdef INTERLOCK
+    node.machinestate == ACTIVATED ||
+#endif
+    node.machinestate == SHUTTINGDOWN) {
     static unsigned long lst = millis();
     if (millis() - lst > 1000) {
       lst = millis();
@@ -335,37 +358,50 @@ void loop() {
       node.updateDisplayStateMsg(node.machinestate.timeLeftInThisState().c_str(), 2);
     }
   };
-
+#ifdef INTERLOCK
   if (node.machinestate == ACTIVATED && node.machinestate.secondsInThisState() > MAX_SECS_IDLE) {
     Log.println("Power off after beeing idle too long.");
     node.buzzerErr();
     node.machinestate = SHUTTINGDOWN;
     idle_poweroff++;
   };
+#endif
+  bool interlockRelay = ((node.machinestate == POWERED) || (node.machinestate == RUNNING) ||
+#ifdef INTERLOCK
+                         (node.machinestate == ACTIVATED) ||
+#endif
+                         (node.machinestate == SHUTTINGDOWN))
+                          ? HIGH
+                          : LOW;
 
-  node.setMonitoredOutput(RELAY_GPIO,
-                          ((node.machinestate == POWERED) || (node.machinestate == RUNNING) || (node.machinestate == ACTIVATED) || (node.machinestate == SHUTTINGDOWN)) ? HIGH : LOW);
-
+  node.setMonitoredOutput(RELAY_GPIO, interlockRelay);
   static unsigned long lst = millis();
   if (millis() - lst > 10 * 1000) {
     lst = millis();
+    Debug.printf("Relay(%d):%s", RELAY_GPIO, interlockRelay ? "closed" : "open");
+#ifdef MOTOR_CURRENT
+    Debug.printf("\tCurr/motorCurrent(0x%x): %4u(%s(%d))",
+                 MOTOR_CURRENT, motorCurrent->raw(), motorCurrent->state() ? "On " : "Off", motorCurrent->rawState());
+#endif
+#ifdef INTERLOCK
+    Debug.printf("\tOpto1/Interlock(0x%x): %4u(%s(%d))",
+                 INTERLOCK, interlockDetect->raw(), interlockDetect->state() ? "On " : "Off", interlockDetect->rawState());
+#endif
 #ifdef ONOFFSWITCH
-    Debug.printf("Opto2/onOffSwitch(0x%x): %4u(%s(%d))",
+    Debug.printf("\tOpto2/onOffSwitch(0x%x): %4u(%s(%d))",
                  ONOFFSWITCH, onoffSwitchDetect->raw(), onoffSwitchDetect->state() ? "On " : "Off", onoffSwitchDetect->rawState());
 #endif
-    Debug.printf("Curr/motorCurrent(0x%x): %4u(%s(%d)) Opto1/Interlock(0x%x): %4u(%s(%d))\n",
-                 MOTOR_CURRENT, motorCurrent->raw(), motorCurrent->state() ? "On " : "Off", motorCurrent->rawState(),
-                 INTERLOCK, interlockDetect->raw(), interlockDetect->state() ? "On " : "Off", interlockDetect->rawState());
 #ifdef SUCCOBUS_DETECT
-    Debug.printf("Opto4/succoSwitch(0x%x): %4u(%s(%d))",
+    Debug.printf("\tOpto4/succoSwitch(0x%x): %4u(%s(%d))",
                  SUCCOBUS_DETECT, succobusDetect->raw(), succobusDetect->state() ? "On " : "Off", succobusDetect->rawState());
 #endif
+    Debug.println();
   }
-#if 0
- {
+#if 1
+  {
     static unsigned long lst = millis();
     if (millis() - lst > 1 * 1000) {
-      Debug.printf("1: %01d 2: %01d 3: %01d 4: %01d C: %u\n",
+      Debug.printf("Optos:\t1:%01d\t2:%01d\t3:%01d\t4:%01d\tC:%u\n",
                    expandedDigitalRead(node.OPTO0),
                    expandedDigitalRead(node.OPTO1),
                    expandedDigitalRead(node.OPTO2),
