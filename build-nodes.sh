@@ -32,15 +32,14 @@ do
 			--build-path "$BUILDDIR" \
 			--fqbn  "$board:UploadSpeed=921600,CPUFreq=240,FlashFreq=80,FlashMode=qio,FlashSize=4M,PartitionScheme=min_spiffs,DebugLevel=none,LoopCore=1,EventsCore=1,EraseFlash=none" \
 			--jobs 120 \
-			--build-property build.partitions=min_spiffs\
-			--build-property "$all_flags -DTAG=$TAG" \
+			--build-property build.partitions=min_spiffs \
+			--build-property "$all_flags -DTAG=\"$TAG\"" \
 			--verbose \
-			. 2>&1 | tee "$BUILDDIR/compile-$node.log" \
-			|| exit
+			. # >"$BUILDDIR/compile-$node.log" 2&>1 
 		cd "$OUTDIR"
 		rm -f *.bootloader.bin *.map *.merged.bin *.partitions.bin
 	) || exit $?
 done
-rm -rf  "$BUILDDIR" 
+# rm -rf  "$BUILDDIR" 
 exit 0
 #			--build-property "$all_flags -DTAG=\"$TAG\"" \
