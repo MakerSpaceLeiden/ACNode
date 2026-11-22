@@ -27,7 +27,6 @@
 
 #include "mbedtls/sha256.h" /* SHA-256 only */
 #include "mbedtls/md.h"     /* generic interface */
-
 #include <list>
 #include <vector>
 #include <algorithm>    // std::find
