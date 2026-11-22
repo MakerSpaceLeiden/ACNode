@@ -29,7 +29,7 @@
 #define MBOK(x) { \
     if ((ret = (x)) < 0) {\
         char buf[128];mbedtls_strerror( ret, buf, sizeof(buf) ); \
-        ESP_LOGE(TAG, #x " failed at line %d. returned 0x%02x, %s", __LINE__, (unsigned int) - ret, buf); \
+        ESP_LOGE(logtag, #x " failed at line %d. returned 0x%02x, %s", __LINE__, (unsigned int) - ret, buf); \
         Log.printf(#x " failed at line %d. returned 0x%04x, %s\n", __LINE__, (unsigned int) - ret, buf); \
         goto exit; \
     }; \
@@ -53,7 +53,7 @@ int rfc4648_base64_encode( unsigned char * dst,size_t dlen, size_t * olen,const 
 }
 
 static const char seed[] = "jwt" __DATE__ __TIME__;
-static const char TAG[] = "msl-jwt-acnode";
+static const char logtag[] = "msl-jwt-acnode";
 
 static size_t ecdsa_asn1_to_raw(unsigned char * sig,  size_t key_len, size_t sig_len)
 {

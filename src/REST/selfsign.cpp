@@ -37,7 +37,7 @@
 
 #define DEFAULT_PEM_MAX (4*1024) // larger than 1000-ish cert and 100-150 byte key.
 static const char seed[] = "selfsign" __DATE__ __TIME__;
-static const char TAG[] = "msl-selfsign-acnode";
+static const char logtag[] = "msl-selfsign-acnode";
 
 int pem2der(unsigned char * buff) {
     size_t len = strlen((const char*) buff);
@@ -95,7 +95,7 @@ char * der2pem(const char *what, unsigned char * der, size_t derlen) {
 #define MBOK(x) { \
 if ((ret = (x)) < 0) {\
 mbedtls_strerror( ret, buf, sizeof(buf) ); \
-ESP_LOGE(TAG, #x " failed. returned -x%02x, %s", (unsigned int) - ret, buf); \
+ESP_LOGE(logtag, #x " failed. returned -x%02x, %s", (unsigned int) - ret, buf); \
 goto exit; \
 }; \
 }
@@ -292,7 +292,7 @@ int sign_and_toder(mbedtls_pk_context * key, mbedtls_x509write_cert * crt, unsig
     outkeylen = ret;
     
     if ((NULL == *out_key_as_der) && (NULL == (*out_key_as_der = (unsigned char*)malloc(outkeylen)))) {
-        ESP_LOGE(TAG, "outkeylen malloc failed (%u bytes)", outkeylen);
+        ESP_LOGE(logtag, "outkeylen malloc failed (%u bytes)", outkeylen);
         goto exit;
     };
     memcpy(*out_key_as_der, der, outkeylen);
@@ -309,7 +309,7 @@ int sign_and_toder(mbedtls_pk_context * key, mbedtls_x509write_cert * crt, unsig
     outcertlen = ret;
     
     if ((NULL == *out_cert_as_der) && (NULL == (*out_cert_as_der = (unsigned char*)malloc(outcertlen)))) {
-        ESP_LOGE(TAG, "outcertlen malloc failed (%u bytes)", outcertlen);
+        ESP_LOGE(logtag, "outcertlen malloc failed (%u bytes)", outcertlen);
         free(*out_cert_as_der);
         goto exit;
     }
