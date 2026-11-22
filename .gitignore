@@ -10,3 +10,4 @@ keydb.txt
 venv
 test-binparse
 *.DSYM
+examples/*/build
